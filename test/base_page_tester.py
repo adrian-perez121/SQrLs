@@ -1,11 +1,18 @@
+# To get the files from lstore
+import sys
+sys.path.append('../lstore')
+
 import unittest
-from lstore.base_page import BasePage
+from base_page import BasePage
+
 
 class MyTestCase(unittest.TestCase):
-	def test_has_capacity(self):
-		test_page = BasePage()
-		for i in range(10):
-			test_page.write(i)
+	def test(self):
+		test_page = BasePage(5)
+		for i in range(5):
+			test_page.new_record([123,123,123,123,123])
+			record = test_page.get_record(i, [1,1,1,1,1])
+			self.assertEqual(record, [123,123,123,123,123])
 
 	#def test_write(self):
 

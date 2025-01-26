@@ -32,11 +32,14 @@ class BasePage:
 		# Project columns index is an array of 1s and 0s. 1 is a column you want
 		# 0 is a column you don't want
 		record = []
-		for index, page in enumerate(self.pages):
+		column_pages = self.pages[ : self.num_columns - self.metadata_columns]
+		for index, page in enumerate(column_pages):
 			if projected_columns_index[index]:
 				record.append(page.read(slot))
 			else:
 				record.append(None)
+
+		return record
 
 	def new_record(self, record):
 		"""
@@ -47,12 +50,12 @@ class BasePage:
 		if not self.has_capacity():
 			raise "Page is full"
 
-		if record.length > self.num_columns - self.metadata_columns:
+		if len(record) > self.num_columns - self.metadata_columns:
 			raise "Not enough columns"
 
 		slot = self.next_slot.popleft()
-		for data in record:
-			self.pages[slot].write(data)
+		for i, data in enumerate(record):
+			self.pages[i].write(data)
 
 
 
