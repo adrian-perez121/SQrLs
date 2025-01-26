@@ -10,7 +10,9 @@ class BasePage:
 		self.num_records = 0  # Tracks the total number of records
 		self.metadata_columns = 4  # Fixed number of metadata columns
 		self.num_columns = num_columns + self.metadata_columns
-		self.next_slot = deque(range(0,512)) # A queue from 0 to 511
+
+		# A queue from 0 to 511. We keep track of the slot we write to through this data structure, this way, everything aligns (hopefully)
+		self.next_slot = deque(range(0,512))
 		# A page for each column + meta_data columns
 		# For the sake of consistency, the last four columns should be the metadata columns
 		self.pages = [Page() for _ in range(self.num_columns)]
@@ -55,7 +57,7 @@ class BasePage:
 
 		slot = self.next_slot.popleft()
 		for i, data in enumerate(record):
-			self.pages[i].write(data)
+			self.pages[i].write(data, slot)
 
 
 

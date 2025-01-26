@@ -9,12 +9,16 @@ class Page:
         # each page can hold 512 8 bytes records
         return self.num_records < 512
 
-    def write(self, value):
+    def write(self, value, slot):
+        """
+        Writing to the page. Slot number has to be specified. Value is converted into bytes because
+        the page stores data in a byte array.
+        """
         # Value is a 64 bit (aka 8byte) int
         if self.has_capacity():
             val_to_byte = value.to_bytes(8, byteorder='big')
             # Insert by bytes
-            i = self.num_records * 8
+            i = slot * 8
             for byte in val_to_byte:
                 self.data[i] = byte
                 i += 1
