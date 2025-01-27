@@ -1,4 +1,4 @@
-from page import Page  # Assuming your Page class is defined in page.py
+from lstore.page import Page  # Assuming your Page class is defined in page.py
 from collections import deque
 
 
