@@ -32,25 +32,33 @@ class ConceptualPage:
     return self.num_records < 4096
 
 
-  def read_record(self, slot, projected_columns_index):
+  def read_record_at(self, slot, projected_columns_index):
     """
-    A method for returning the record in the base page. Method only reads columns that
-    are specified in the projected_columns_index array.
+    Returns an array based off of the projected columns index. This does not return any metadata. Just the record
     """
-
+    if slot < 0 or slot >= self.num_records:
+      raise IndexError("No record to read in that slot")
     # Project columns index is an array of 1s and 0s. 1 is a column you want
     # 0 is a column you don't want
-    pass
+    physical_page_level = slot // 512
+    physical_page_slot = slot % 512
     record = []
-    column_pages = self.pages[: self.regular_columns] # Ignore the meta data
-    for index, page in enumerate(column_pages):
-      if projected_columns_index[index]:
-        record.append(page.read(slot))
+    # Ignore the metadata columns
+    for i in range(self.metadata_columns, self.total_columns):
+      # If true we want this column, we subtract because the project_columns array starts at 0
+      if projected_columns_index[i - self.metadata_columns]:
+        record.append(self.pages[i][physical_page_level].read(physical_page_slot))
       else:
         record.append(None)
 
     return record
 
+  def read_metadata_at(self, slot):
+    """
+    Specifically only for reading the metadata of a record. Useful if you need to update something
+    like the indirection column or schema encoding.
+    """
+    pass
 
   def write_record(self, record):
     """

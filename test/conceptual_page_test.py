@@ -24,6 +24,14 @@ class MyTestCase(unittest.TestCase):
     with self.assertRaises(Exception):
       test_conceptual_page.write_record([1])
 
+  def test_read_record_at(self):
+    test_conceptual_page = ConceptualPage(3)
+    for i in range(4096):
+      test_conceptual_page.write_record([0, 0, 0, 0, i, i, i])
+      self.assertEqual([i,i,i], test_conceptual_page.read_record_at(i, [1,1,1]))
+      self.assertEqual([i, None, i], test_conceptual_page.read_record_at(i, [1, None, 1]))
+      self.assertEqual([None, None, None], test_conceptual_page.read_record_at(i, [None, None, None]))
+
 
   # def test_has_capacity(self):
   #   test_page = ConceptualPage(1)
