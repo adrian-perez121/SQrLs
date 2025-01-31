@@ -24,10 +24,10 @@ class Page:
                 i += 1
             self.num_records += 1
         else:
-            raise "Page is full"
+            raise IndexError("Physical Page is full")
 
     def read(self, slot):
-      if slot > 512 or slot < 0: raise IndexError("Index out of range") or slot < self.num_records
+      if slot > 512 or slot < 0 or slot < self.num_records: raise IndexError("Index out of range")
 
       return int.from_bytes(self.data[slot*8 : (slot+1)*8], byteorder='big')
 
