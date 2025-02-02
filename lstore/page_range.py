@@ -84,6 +84,19 @@ class PageRange:
     regular_data = self.tail_pages[tail_page_index].read_record_at(tail_page_slot, project_column_index)
     return meta_data + regular_data
 
+  def update_base_record_column(self, base_page_index, base_page_slot, column, data):
+    """
+    A method should be used for actions like rewriting the schema encoding, rewriting the indirection column, setting the RID column
+    to a delete value. This is only for base pages
+    """
+    self.base_pages[base_page_index].update_column(column, base_page_slot, data)
+
+  def update_tail_record_column(self, tail_page_index, tail_page_slot, column, data):
+    """
+    A method should be used for actions like rewriting the schema encoding, rewriting the indirection column, setting the RID column
+    to a delete value. This is only for tail pages
+    """
+    self.tail_pages[tail_page_index].update_column(column, tail_page_slot, data)
 
 
 
