@@ -1,4 +1,5 @@
 from lstore.table import Table
+import lstore.config
 
 class Database():
 
@@ -26,7 +27,7 @@ class Database():
         self.tables[name] = table
         return table
 
-    
+
     """
     # Deletes the specified table
     """

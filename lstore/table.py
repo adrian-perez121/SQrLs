@@ -8,7 +8,6 @@ TIMESTAMP_COLUMN = 2
 SCHEMA_ENCODING_COLUMN = 3
 # }
 
-
 class Record:
 
     def __init__(self, rid, key, columns):
@@ -34,4 +33,4 @@ class Table:
     def __merge(self):
         print("merge is happening")
         pass
- 
+
