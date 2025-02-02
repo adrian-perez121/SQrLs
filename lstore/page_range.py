@@ -24,7 +24,7 @@ class PageRange:
     # check if the last page has room
     return len(self.base_pages) < 16 or self.base_pages[-1].has_capacity()
 
-  def __alocate_new_base_page(self):
+  def __allocate_new_base_page(self):
     """
     Allocates a new basepage only if needed and changes the location pointers of where to write to
     """
@@ -51,7 +51,7 @@ class PageRange:
     location = (self.base_pages_index, self.base_pages_slot)
 
     self.base_pages_slot += 1
-    self.__alocate_new_base_page()
+    self.__allocate_new_base_page()
 
     return location
 
@@ -67,21 +67,21 @@ class PageRange:
 
     return location
 
-  def read_base_record(self, base_page_index, base_page_slot, project_column_index):
+  def read_base_record(self, base_page_index, base_page_slot, projected_column_index):
     """
     This retrieves the regular data from base record. The record contains the metadata columns AND the regular data columns
     """
     meta_data = self.base_pages[base_page_index].read_metadata_at(base_page_slot)
-    regular_data = self.base_pages[base_page_index].read_record_at(base_page_slot, project_column_index)
+    regular_data = self.base_pages[base_page_index].read_record_at(base_page_slot, projected_column_index)
     return meta_data + regular_data
 
-  def read_tail_record(self, tail_page_index, tail_page_slot, project_column_index):
+  def read_tail_record(self, tail_page_index, tail_page_slot, projected_column_index):
     """
     Retrieves regular data from a tail record. Record contains metadata columns and regular data columns. Though if you
     just want metadata you can set the projected columns index to all 0s
     """
     meta_data = self.tail_pages[tail_page_index].read_metadata_at(tail_page_slot)
-    regular_data = self.tail_pages[tail_page_index].read_record_at(tail_page_slot, project_column_index)
+    regular_data = self.tail_pages[tail_page_index].read_record_at(tail_page_slot, projected_column_index)
     return meta_data + regular_data
 
   def update_base_record_column(self, base_page_index, base_page_slot, column, data):
