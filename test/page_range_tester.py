@@ -16,7 +16,7 @@ class MyTestCase(unittest.TestCase):
       # 65536 = 4096 * 16 = basepage slots * number of basepages
       for i in range(65536):
         self.assertTrue(test_page_range.has_base_page_capacity())
-        test_page_range.write_new_record(i,[i, i])
+        test_page_range.write_base_record([i, i, i, i, i, i])
 
       self.assertFalse(test_page_range.has_base_page_capacity())
 
@@ -25,8 +25,8 @@ class MyTestCase(unittest.TestCase):
       # This test is to make sure we can fill up the page range with the maximum amount of page records
       # 65536 = 4096 * 16 = basepage slots * number of basepages
       for i in range(65536):
-        index, slot = test_page_range.write_new_record(i, [i, i])
-        self.assertEqual([i, i], test_page_range.read_base_record(index, slot, [1, 1]))
+        index, slot = test_page_range.write_base_record([i, i, i, i, i, i])
+        self.assertEqual([i, i], test_page_range.read_base_record(index, slot, [1, 1])[4:])
 
 
 if __name__ == '__main__':
