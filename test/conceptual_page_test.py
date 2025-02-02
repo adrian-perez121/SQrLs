@@ -11,6 +11,14 @@ from conceptual_page import ConceptualPage
 
 class MyTestCase(unittest.TestCase):
 
+  def test_has_capacity(self):
+    test_page = ConceptualPage(1)
+    for i in range(4096):
+      self.assertTrue(test_page.has_capacity())
+      test_page.write_record([1, 1, 1, 1, 1])
+
+    self.assertFalse(test_page.has_capacity())
+
   def test_write_record(self):
     test_conceptual_page = ConceptualPage(3)
     for i in range(4096):
@@ -37,14 +45,6 @@ class MyTestCase(unittest.TestCase):
     for i in range(4096):
       test_conceptual_page.write_record([i, i, i, i, 0, 0, 0, 0])
       self.assertEqual([i, i, i, i], test_conceptual_page.read_metadata_at(i))
-
-  # def test_has_capacity(self):
-  #   test_page = ConceptualPage(1)
-  #   for i in range(512):
-  #     self.assertTrue(test_page.has_capacity())
-  #     test_page.new_record([1])
-  #
-  #   self.assertFalse(test_page.has_capacity())
 
 
 if __name__ == '__main__':
