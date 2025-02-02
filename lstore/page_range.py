@@ -33,6 +33,11 @@ class PageRange:
       self.base_pages_index += 1 # Move up the base pages we are writing into
       self.base_pages_slot = 0 # This should get reset from 4095 to 0
 
+  def __allocate_new_tail_page(self):
+    if not self.tail_pages[-1].has_capacity():
+      self.tail_pages.append(ConceptualPage(self.regular_columns))
+      self.tail_pages_index += 1  # Move up the base pages we are writing into
+      self.tail_pages_slot = 0  # This should get reset from 4095 to 0
 
   def write_base_record(self, record):
     """
@@ -50,6 +55,18 @@ class PageRange:
 
     return location
 
+  def write_tail_record(self, record):
+    if len(record) != self.total_columns:
+      raise IndexError(f"Expected #{self.regular_columns}, you only gave #{len(record)} in PageRange")
+    self.tail_pages[self.tail_pages_index].write_record(record)
+    # Location is a tuple of base page index and slot, this should go in the page directory in the table along with PageRange it is in
+    location = (self.tail_pages_index, self.tail_pages_slot)
+
+    self.tail_pages_slot += 1
+    self.__allocate_new_tail_page()
+
+    return location
+
   def read_base_record(self, base_page_index, base_page_slot, project_column_index):
     """
     This retrieves the regular data from base record. The record contains the metadata columns AND the regular data columns
@@ -58,6 +75,14 @@ class PageRange:
     regular_data = self.base_pages[base_page_index].read_record_at(base_page_slot, project_column_index)
     return meta_data + regular_data
 
+  def read_tail_record(self, tail_page_index, tail_page_slot, project_column_index):
+    """
+    Retrieves regular data from a tail record. Record contains metadata columns and regular data columns. Though if you
+    just want metadata you can set the projected columns index to all 0s
+    """
+    meta_data = self.tail_pages[tail_page_index].read_metadata_at(tail_page_slot)
+    regular_data = self.tail_pages[tail_page_index].read_record_at(tail_page_slot, project_column_index)
+    return meta_data + regular_data
 
 
 
