@@ -37,6 +37,10 @@ class ConceptualPage:
     """
     if slot < 0 or slot >= self.num_records:
       raise IndexError("No record to read in that slot")
+
+    if len(projected_columns_index) != self.regular_columns:
+      raise Exception(f"In ConceptualPage, expected projected columns index of size #{self.regular_columns}, not #{len(projected_columns_index)}")
+
     # Project columns index is an array of 1s and 0s. 1 is a column you want
     # 0 is a column you don't want
     physical_page_level = slot // 512
