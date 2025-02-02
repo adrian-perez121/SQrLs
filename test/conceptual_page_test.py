@@ -32,6 +32,11 @@ class MyTestCase(unittest.TestCase):
       self.assertEqual([i, None, i], test_conceptual_page.read_record_at(i, [1, None, 1]))
       self.assertEqual([None, None, None], test_conceptual_page.read_record_at(i, [None, None, None]))
 
+  def test_read_meta_data_at(self):
+    test_conceptual_page = ConceptualPage(4)
+    for i in range(4096):
+      test_conceptual_page.write_record([i, i, i, i, 0, 0, 0, 0])
+      self.assertEqual([i, i, i, i], test_conceptual_page.read_metadata_at(i))
 
   # def test_has_capacity(self):
   #   test_page = ConceptualPage(1)

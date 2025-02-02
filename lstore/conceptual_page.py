@@ -58,7 +58,14 @@ class ConceptualPage:
     Specifically only for reading the metadata of a record. Useful if you need to update something
     like the indirection column or schema encoding.
     """
-    pass
+    physical_page_level = slot // 512
+    physical_page_slot = slot % 512
+    record = []
+    for i in range(self.metadata_columns):
+      # the first 4 columns are the metadata columns
+      record.append(self.pages[i][physical_page_level].read(physical_page_slot))
+
+    return record
 
   def write_record(self, record):
     """
