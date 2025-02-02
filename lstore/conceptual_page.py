@@ -1,6 +1,5 @@
 from lstore.page import Page  # Assuming your Page class is defined in page.py
-from collections import deque
-
+import lstore.config as config
 
 class ConceptualPage:
   def __init__(self, num_columns):
@@ -87,4 +86,17 @@ class ConceptualPage:
 
     self.num_records += 1
     self.__allocate_new_physical_pages() # In case you fill the physical page up
+
+  def update_column(self, column ,slot, new_indirection):
+    """
+    Should primarily be used for updating the indirection and schema encoding columns.
+    Use carefully because we aren't supposed to update data in place for most cases
+    """
+    if slot < 0 or slot > self.num_records:
+      raise IndexError("Invalid slot trying to be accessed")
+
+    physical_page_level = slot // 512
+    physical_page_slot = slot % 512
+    self.pages[column][physical_page_level].write(new_indirection, physical_page_slot)
+
 

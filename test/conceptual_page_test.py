@@ -2,6 +2,7 @@
 import sys
 
 from lstore.conceptual_page import ConceptualPage
+import lstore.config as config
 
 sys.path.append('../lstore')
 
@@ -45,6 +46,15 @@ class MyTestCase(unittest.TestCase):
     for i in range(4096):
       test_conceptual_page.write_record([i, i, i, i, 0, 0, 0, 0])
       self.assertEqual([i, i, i, i], test_conceptual_page.read_metadata_at(i))
+
+  def test_update_column(self):
+    test_page = ConceptualPage(1)
+    for i in range(4096):
+      test_page.write_record([i,i,i,i,i])
+      self.assertEqual(i, test_page.read_metadata_at(i)[config.INDIRECTION_COLUMN])
+      test_page.update_column(config.INDIRECTION_COLUMN ,i, i + 1)
+      self.assertEqual(i + 1, test_page.read_metadata_at(i)[config.INDIRECTION_COLUMN])
+
 
 
 if __name__ == '__main__':
