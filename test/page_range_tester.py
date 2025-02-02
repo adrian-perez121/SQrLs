@@ -20,5 +20,14 @@ class MyTestCase(unittest.TestCase):
 
       self.assertFalse(test_page_range.has_base_page_capacity())
 
+    def test_read_base_record(self):
+      test_page_range = PageRange(2)
+      # This test is to make sure we can fill up the page range with the maximum amount of page records
+      # 65536 = 4096 * 16 = basepage slots * number of basepages
+      for i in range(65536):
+        index, slot = test_page_range.write_new_record(i, [i, i])
+        self.assertEqual([i, i], test_page_range.read_base_record(index, slot, [1, 1]))
+
+
 if __name__ == '__main__':
     unittest.main()

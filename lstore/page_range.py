@@ -60,13 +60,18 @@ class PageRange:
 
     self.base_pages[self.base_pages_index].write_record(new_record)
     # Location is a tuple of base page index and slot, this should go in the page directory in the table along with PageRange it is in
-    location = (self.base_pages_slot, self.base_pages_index)
+    location = (self.base_pages_index, self.base_pages_slot)
 
     self.base_pages_slot += 1
     self.__alocate_new_base_page()
 
     return location
 
+  def read_base_record(self, base_page_index, base_page_slot, project_column_index):
+    """
+    This retrieves the regular data from base record.
+    """
+    return self.base_pages[base_page_index].read_record_at(base_page_slot, project_column_index)
 
 
 
