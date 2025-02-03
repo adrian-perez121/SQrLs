@@ -1,6 +1,18 @@
+from BTrees.OOBTree import OOBTree
+
 """
 A data strucutre holding indices for various columns of a table. Key column should be indexd by default, other columns can be indexed through this object. Indices are usually B-Trees, but other data structures can be used as well.
 """
+
+# Some quick ideas...We know primary keys can be unique but if we choose to index other columns,
+# there is no guarantee that the numbers there will be unique. For this reason, I believe that
+# the Btree should store sets of RIDs as values. Since primary keys are unique, that's not needed but for other
+# indexes it is.That way, you can iterate through each set if RIDs.
+# For example, self.indices[1][10] = {20, 4, 19}. Here we are looking for records where the first column has a value of 10
+# the records in question are stored in a set.
+
+# The tree is made up of key, value pairs where the key is value in a column and value is an RID which
+# can later be used by the page range.
 
 class Index:
 
@@ -9,11 +21,24 @@ class Index:
         self.indices = [None] *  table.num_columns
         pass
 
+    # def add(self, record):
+    # A method for adding something to the index. This method would most likely be used during the
+    # insert query. From the record the RID can be extracted and then for the columns that contain
+    # indexes, the corresponding record columns can be added to those indexes.
+
+    # def delete(self, record)
+    # This is kind of tricky but here is how I would go about it. This method would be used in the
+    # delete query. When a record is deleted you also call delete on the index. The RID is extracted
+    # and for each column that has an index, we search the index, find the RID and delete it from
+    # set. If the set is empty after we delete the RID, we can also delete the key from the tree.
+    # This way we prevent our tree from becoming bloated
+
     """
     # returns the location of all records with the given value on column "column"
     """
 
     def locate(self, column, value):
+      # Search down an index for a specific set of RIDs. If it's not found, then it doesn't exist
         pass
 
     """
@@ -21,6 +46,9 @@ class Index:
     """
 
     def locate_range(self, begin, end, column):
+      # This one confuses me a bit too. Not the most efficient way but we could start with an empty
+      # array then we iterate from begin to end and append each of the RIDs in the set to this array.
+      # By the end of the function we should have an array with all RIDs that were within the specified range.
         pass
 
     """
@@ -28,6 +56,10 @@ class Index:
     """
 
     def create_index(self, column_number):
+      # This function is going to take TIME. My idea is that we can use the primary key index to get all the RIDs
+      # then we can use these RIDs to find the records in the table. From here we can read the column needed
+      # and insert into the new tree along with RID. This is going to take time because we need to first get all the RIDs
+      # then we have to read from the table. THEN we insert into the new tree.
         pass
 
     """
@@ -35,4 +67,13 @@ class Index:
     """
 
     def drop_index(self, column_number):
+      # just use del self.indices[column_number], though we shouldn't be allowed to delete the primary key column
         pass
+
+    # def create_def_index(self):
+    #   Method would probably be used only on the initial creation of a page
+    #   should take the table key and put a tree in there to be used later
+    #   something like:
+    #   self.indices[self.table.key] = OOBTree()
+    #   that would be all this method does.
+
