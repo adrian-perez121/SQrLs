@@ -28,9 +28,16 @@ class Table:
         self.num_columns = num_columns
         self.page_directory = {}
         self.index = Index(self)
+        self.rid = 1
         pass
+
+    def new_rid(self):
+      tmp = self.rid
+      self.rid += 1
+      return tmp
 
     def __merge(self):
         print("merge is happening")
         pass
+
 
