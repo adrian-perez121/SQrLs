@@ -22,13 +22,15 @@ class MyTestCase(unittest.TestCase):
       record.append(data)
     return record
 
-  def test_add(self):
+  def test_add_and_delete(self):
     # For now, I am only going to test index
     table = Table("test_table", 3, 0)
     index = table.index
 
     used_rids = set()
     used_pks = set()
+    # An array of tuples to practice deleting
+    records = []
     for i in range(20):
       # Generating a random set of unique RIDs and PKs {
       rid = random.randint(1,100)
@@ -46,6 +48,16 @@ class MyTestCase(unittest.TestCase):
       # Makes sure the RID is in the right place
       self.assertTrue(indexed_column in index.indices[0])
       self.assertTrue(index.indices[0][indexed_column], rid)
+      records.append(record)
+    # Now test deleting
+    for record in records:
+      # record[4] is the indexed column
+      pk = record[4]
+      # Make sure it is in there before you delete it
+      self.assertTrue(pk in index.indices[0])
+      index.delete(record)
+      self.assertTrue(pk not in index.indices[0])
+
 
 
 

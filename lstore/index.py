@@ -36,12 +36,19 @@ class Index:
           # We have to do i + 4 because the first 4 columns are metadata columns. In other words, I am aligning
           column_index[record[i + 4]] = rid
 
-    # def delete(self, record)
-    # This is kind of tricky but here is how I would go about it. This method would be used in the
-    # delete query. When a record is deleted you also call delete on the index. The RID is extracted
-    # and for each column that has an index, we search the index, find the RID and delete it from
-    # set. If the set is empty after we delete the RID, we can also delete the key from the tree.
-    # This way we prevent our tree from becoming bloated
+    def delete(self, record):
+      """
+      This method would be used in the
+      delete query. When a record is deleted you also call delete on the index. The RID is extracted
+      and for each column that has an index, we search the index. For now this only works with unique primary keys
+      """
+      for i, column_index in enumerate(self.indices):
+        if column_index != None:
+          pk = record[i + 4]
+          if pk in column_index:
+            del column_index[record[i + 4]]
+          else:
+            raise Exception("They key was in the index")
 
     """
     # returns the location of all records with the given value on column "column"
