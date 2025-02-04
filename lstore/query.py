@@ -93,13 +93,15 @@ class Query:
     # Assume that select will never be called on a key that doesn't exist # This is nice to know
     """
     def select(self, search_key, search_key_index, projected_columns_index):
-      rid = self.table.index.locate(search_key_index, search_key)
-      page_range_index, base_page_index, slot = self.table.page_directory[rid]
-      # We know we can read from a base record because the rid in a page directory points to a page record
-      record_data = self.table.page_ranges[page_range_index].read_base_record(base_page_index, slot, projected_columns_index)
-      record = self.__build_record(record_data, search_key)
+      records = []
+      for rid in self.table.index.locate(search_key_index, search_key):
+        page_range_index, base_page_index, slot = self.table.page_directory[rid]
+        # We know we can read from a base record because the rid in a page directory points to a page record
+        record_data = self.table.page_ranges[page_range_index].read_base_record(base_page_index, slot, projected_columns_index)
+        record = self.__build_record(record_data, search_key)
+        records.append(record)
 
-      return record
+      return records
     """
     # Read matching record with specified search key
     # :param search_key: the value you want to search based on
@@ -111,7 +113,8 @@ class Query:
     # Assume that select will never be called on a key that doesn't exist
     """
     def select_version(self, search_key, search_key_index, projected_columns_index, relative_version):
-        pass
+
+      pass
 
 
     """
