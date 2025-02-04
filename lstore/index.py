@@ -56,7 +56,11 @@ class Index:
 
     def locate(self, column, value):
       # Search down an index for a specific set of RIDs. If it's not found, then it doesn't exist
-        pass
+      tree = self.indices[column]
+      if value not in tree:
+        raise Exception("Searching for a key that does not exist")
+
+      return tree[value] # For now this only returns a singular RID
 
     """
     # Returns the RIDs of all records with values in column "column" between "begin" and "end"

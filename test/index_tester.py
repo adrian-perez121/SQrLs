@@ -22,7 +22,7 @@ class MyTestCase(unittest.TestCase):
       record.append(data)
     return record
 
-  def test_add_and_delete(self):
+  def test_add_and_delete_and_locate(self):
     # For now, I am only going to test index
     table = Table("test_table", 3, 0)
     index = table.index
@@ -47,7 +47,7 @@ class MyTestCase(unittest.TestCase):
       index.add(record)
       # Makes sure the RID is in the right place
       self.assertTrue(indexed_column in index.indices[0])
-      self.assertTrue(index.indices[0][indexed_column], rid)
+      self.assertTrue(index.locate(0,pk), rid)
       records.append(record)
     # Now test deleting
     for record in records:
