@@ -2,6 +2,7 @@ import unittest
 
 import sys
 import random
+from selectors import KqueueSelector
 
 from lstore.table import Table
 import lstore.config as config
@@ -41,6 +42,19 @@ class MyTestCase(unittest.TestCase):
       record = query.select(pk, 0, [1, 1, 1])[0]
       self.assertEqual(record_data, record.columns)
       rid += 1
+
+  def test_insert_select_duplicate(self):
+    table = Table("test", 3, 0)
+    query = Query(table)
+    page_directory = table.page_directory
+    records_data = [[1, 2, 5], [1, 20, 50], [1, 200, 500]]
+    for record_data in records_data:
+      query.insert(*record_data)
+    records = query.select(1, 0, [1, 1, 1])
+    # This works but be careful because sets aren't ordered
+    for i, record in enumerate(records):
+      self.assertEqual(records_data[i], record.columns)
+
 
 
 
