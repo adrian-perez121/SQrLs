@@ -1,5 +1,5 @@
 from BTrees.OOBTree import OOBTree
-
+import lstore.config as config
 """
 A data strucutre holding indices for various columns of a table. Key column should be indexd by default, other columns can be indexed through this object. Indices are usually B-Trees, but other data structures can be used as well.
 """
@@ -17,14 +17,24 @@ A data strucutre holding indices for various columns of a table. Key column shou
 class Index:
 
     def __init__(self, table):
-        # One index for each table. All our empty initially.
-        self.indices = [None] *  table.num_columns
-        pass
+      # One index for each table. All our empty initially.
+      self.indices = [None] *  table.num_columns
+      self.key = table.key
+      self.indices[self.key] = OOBTree()
 
-    # def add(self, record):
-    # A method for adding something to the index. This method would most likely be used during the
-    # insert query. From the record the RID can be extracted and then for the columns that contain
-    # indexes, the corresponding record columns can be added to those indexes.
+
+
+    def add(self, record):
+      """
+      A method for adding something to the index. This method would most likely be used during the
+      insert query. From the record the RID can be extracted and then for the columns that contain
+      indexes, the data from that column can also be added into the Btree.
+      """
+      rid = record[config.RID_COLUMN]
+      for i, column_index in enumerate(self.indices):
+        if column_index != None:
+          # We have to do i + 4 because the first 4 columns are metadata columns. In other words, I am aligning
+          column_index[record[i + 4]] = rid
 
     # def delete(self, record)
     # This is kind of tricky but here is how I would go about it. This method would be used in the
@@ -70,10 +80,4 @@ class Index:
       # just use del self.indices[column_number], though we shouldn't be allowed to delete the primary key column
         pass
 
-    # def create_def_index(self):
-    #   Method would probably be used only on the initial creation of a page
-    #   should take the table key and put a tree in there to be used later
-    #   something like:
-    #   self.indices[self.table.key] = OOBTree()
-    #   that would be all this method does.
 
