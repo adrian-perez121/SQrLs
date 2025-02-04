@@ -53,6 +53,14 @@ class Query:
     def __number_to_bit_array(self, num, bit_size):
             return [int(bit) for bit in f"{num:0{bit_size}b}"]
 
+    def __build_record(self, record_data, search_key):
+      time = datetime.fromtimestamp(float(record_data[config.TIMESTAMP_COLUMN]))
+      schema_encoding = self.__number_to_bit_array(record_data[config.SCHEMA_ENCODING_COLUMN], self.table.num_columns)
+      # I'm sorry this is a little long
+      record = Record(record_data[config.INDIRECTION_COLUMN], record_data[config.RID_COLUMN], time, schema_encoding,
+                      search_key, record_data[4:])
+      return record
+
     def insert(self, *columns):
         if len(columns) != self.table.num_columns:
           return False
@@ -89,11 +97,7 @@ class Query:
       page_range_index, base_page_index, slot = self.table.page_directory[rid]
       # We know we can read from a base record because the rid in a page directory points to a page record
       record_data = self.table.page_ranges[page_range_index].read_base_record(base_page_index, slot, projected_columns_index)
-
-      time = datetime.fromtimestamp(float(record_data[config.TIMESTAMP_COLUMN]))
-      schema_encoding = self.__number_to_bit_array(record_data[config.SCHEMA_ENCODING_COLUMN], self.table.num_columns)
-      # I'm sorry this is a little long
-      record = Record(record_data[config.INDIRECTION_COLUMN], record_data[config.RID_COLUMN], time, schema_encoding, search_key, record_data[4:])
+      record = self.__build_record(record_data, search_key)
 
       return record
     """
