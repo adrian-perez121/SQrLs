@@ -1,4 +1,5 @@
 from lstore.index import Index
+from lstore.page_range import PageRange
 from time import time
 
 # 4 Meta Data Columns {
@@ -26,6 +27,8 @@ class Table:
         self.name = name
         self.key = key
         self.num_columns = num_columns
+        self.page_ranges = [PageRange(num_columns)]
+        self.page_ranges_index = 0
         self.page_directory = {}
         self.index = Index(self)
         self.rid = 1
@@ -35,6 +38,13 @@ class Table:
       tmp = self.rid
       self.rid += 1
       return tmp
+
+    def add_new_page_range(self):
+      # Check if the last added page range has room for more baserecords
+      # If not add a new one and move the index up
+      if not self.page_ranges[-1].has_base_page_capacity():
+        self.page_ranges.append(PageRange(self.num_columns))
+        self.page_ranges_index += 1
 
     def __merge(self):
         print("merge is happening")
