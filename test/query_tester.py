@@ -11,7 +11,7 @@ sys.path.append('../lstore')
 import unittest
 
 class MyTestCase(unittest.TestCase):
-  def test_insert(self):
+  def test_insert_and_select(self):
     # A rigorous testing of add.
     # Checks if the index was updated correctly
     # Checks if the page directory was update correctly
@@ -24,20 +24,22 @@ class MyTestCase(unittest.TestCase):
     used_pks = set()
     rid = 1 # The table starts rids at 1 so this should align
     # An array of tuples to practice deleting
-    records = []
-    for i in range(20):
+    for i in range(1000):
       # Generating a random set of unique RIDs and PKs {
-      pk = random.randint(1, 100)
+      pk = random.randint(1, 10000)
       while pk in used_pks:
         pk = random.randint(1, 100)
       used_rids.add(rid)
       used_pks.add(pk)
       # }
-      record = [pk, 2, 3]
-      query.insert(*record)
+      record_data = [pk, 2, 3]
+      query.insert(*record_data)
       # Check index has the right value
       self.assertEqual(index.indices[0][pk], rid)
-      self.assertTrue(rid in page_directory) # Not going to check the the values of this just yet
+      self.assertTrue(rid in page_directory) # Not going to check  the values of this just yet
+      # This is an actual record object
+      record = query.select(pk, 0, [1, 1, 1])
+      self.assertEqual(record_data, record.columns)
       rid += 1
 
 

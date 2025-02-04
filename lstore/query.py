@@ -1,8 +1,10 @@
 import time
 
-from lstore.table import Table, Record
+from lstore.table import Table
+from lstore.record import Record
 import lstore.config as config
 from lstore.index import Index
+from datetime import datetime
 
 
 class Query:
@@ -45,6 +47,12 @@ class Query:
     # Return True upon succesful insertion
     # Returns False if insert fails for whatever reason
     """
+    def __bit_array_to_number(self,bit_array):
+        return int("".join(map(str, bit_array)), 2)
+
+    def __number_to_bit_array(self, num, bit_size):
+            return [int(bit) for bit in f"{num:0{bit_size}b}"]
+
     def insert(self, *columns):
         if len(columns) != self.table.num_columns:
           return False
@@ -66,20 +74,6 @@ class Query:
         self.table.add_new_page_range()
 
         return True
-# def bit_array_to_number(bit_array):
-    #     return int("".join(map(str, bit_array)), 2)
-    #
-    # # Example usage
-    # bit_array = [1, 0, 0, 1]
-    # num = bit_array_to_number(bit_array)
-    # print(num)  # Output: 9 (since 1001 in binary is 9)
-# def number_to_bit_array(num, bit_size):
-    #     return [int(bit) for bit in f"{num:0{bit_size}b}"]
-    #
-    # # Example usage
-    # bit_size = 4  # Ensuring a 4-bit representation
-    # bit_array = number_to_bit_array(num, bit_size)
-    # print(bit_array)  # Output: [1, 0, 0, 1]
 
     """
     # Read matching record with specified search key
@@ -88,12 +82,20 @@ class Query:
     # :param projected_columns_index: what columns to return. array of 1 or 0 values.
     # Returns a list of Record objects upon success
     # Returns False if record locked by TPL
-    # Assume that select will never be called on a key that doesn't exist
+    # Assume that select will never be called on a key that doesn't exist # This is nice to know
     """
     def select(self, search_key, search_key_index, projected_columns_index):
-        pass
+      rid = self.table.index.locate(search_key_index, search_key)
+      page_range_index, base_page_index, slot = self.table.page_directory[rid]
+      # We know we can read from a base record because the rid in a page directory points to a page record
+      record_data = self.table.page_ranges[page_range_index].read_base_record(base_page_index, slot, projected_columns_index)
 
+      time = datetime.fromtimestamp(float(record_data[config.TIMESTAMP_COLUMN]))
+      schema_encoding = self.__number_to_bit_array(record_data[config.SCHEMA_ENCODING_COLUMN], self.table.num_columns)
+      # I'm sorry this is a little long
+      record = Record(record_data[config.INDIRECTION_COLUMN], record_data[config.RID_COLUMN], time, schema_encoding, search_key, record_data[4:])
 
+      return record
     """
     # Read matching record with specified search key
     # :param search_key: the value you want to search based on
