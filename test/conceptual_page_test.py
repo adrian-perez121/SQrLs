@@ -7,7 +7,6 @@ import lstore.config as config
 sys.path.append('../lstore')
 
 import unittest
-from conceptual_page import ConceptualPage
 
 
 class MyTestCase(unittest.TestCase):
