@@ -55,6 +55,21 @@ class MyTestCase(unittest.TestCase):
     for i, record in enumerate(records):
       self.assertEqual(records_data[i], record.columns)
 
+  def test_select_version_with_no_updates(self):
+    # Testing how the method works when we only have one version of a record
+    table = Table("test", 3, 0)
+    query = Query(table)
+    used_pks = set()
+    for i in range(5):
+      pk = random.randint(1, 1000)
+      while pk in used_pks:
+        pk = random.randint(1, 1000)
+      used_pks.add(pk)
+      record_data = [pk, random.randint(0,20), random.randint(0, 20)]
+      query.insert(*record_data)
+      record = query.select_version(pk, 0, [1, 1, 1], 0)[0]
+      self.assertEqual(record_data, record.columns)
+
 
 
 

@@ -113,8 +113,15 @@ class Query:
     # Assume that select will never be called on a key that doesn't exist
     """
     def select_version(self, search_key, search_key_index, projected_columns_index, relative_version):
+      records = self.select(search_key, search_key_index, projected_columns_index)
+      version_records = [] # To store the wanted versions of the records
 
-      pass
+      for record in records:
+        if record.indirection == 0: # This means it is a base record so there is no other versions
+          version_records.append(record)
+
+      return version_records
+
 
 
     """
