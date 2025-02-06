@@ -1,6 +1,6 @@
 import time
 
-from lstore.table import Table
+from lstore.table import Table, INDIRECTION_COLUMN
 from lstore.record import Record
 import lstore.config as config
 from lstore.index import Index
@@ -113,9 +113,27 @@ class Query:
     # Assume that select will never be called on a key that doesn't exist
     """
     def select_version(self, search_key, search_key_index, projected_columns_index, relative_version):
+      rids = self.table.index.locate(search_key_index, search_key)
+      if not rids:
+        return False
 
-      pass
+      rid = next(iter(rids))
 
+      for _ in range(len(rids)):
+        if rid == relative_version:
+          break
+        rid = next(iter(rids))
+
+      if rid not in self.table.page_directory:
+        return False
+      page_range_index, tail_page_index, slot = self.table.page_directory[rid]
+      page_range = self.table.page_ranges[page_range_index]
+
+      data = page_range.read_tail_record(tail_page_index, slot, projected_columns_index)
+
+      if data is None:
+        return False
+      return data
 
     """
     # Update a record with specified key and columns
@@ -123,7 +141,29 @@ class Query:
     # Returns False if no records exist with given key or if the target record cannot be accessed due to 2PL locking
     """
     def update(self, primary_key, *columns):
-        pass
+      rids = self.table.index.locate(self.table, primary_key)
+      if not rids:
+        return False
+
+      page_range_index, tail_page_index, slot = self.table.page_directory[rid]
+      page_range = self.table.page_ranges[page_range_index]
+
+      base_data = page_range.read_base_record(tail_page_index, slot)
+
+      if base_data is None:
+        return False
+
+      indirection = base_data[config.INDIRECTION_COLUMN]
+      schema_encoding = base_data[config.SCHEMA_ENCODING_COLUMN]
+
+      base_data = list(base_data)
+      for i, value in enumerate(base_data):
+        if value is not None:
+          schema_encoding[i] = 1
+
+
+
+
 
 
     """

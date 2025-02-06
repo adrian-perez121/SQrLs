@@ -55,6 +55,9 @@ class MyTestCase(unittest.TestCase):
     for i, record in enumerate(records):
       self.assertEqual(records_data[i], record.columns)
 
+  def test_select_versione(self):
+    table = Table("test", 3, 0)
+    query = Query(table)
 
 
 

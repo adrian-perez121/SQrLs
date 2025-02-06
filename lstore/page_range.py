@@ -70,6 +70,7 @@ class PageRange:
   def read_base_record(self, base_page_index, base_page_slot, projected_column_index):
     """
     This retrieves the regular data from base record. The record contains the metadata columns AND the regular data columns
+    @todo
     """
     meta_data = self.base_pages[base_page_index].read_metadata_at(base_page_slot)
     regular_data = self.base_pages[base_page_index].read_record_at(base_page_slot, projected_column_index)
