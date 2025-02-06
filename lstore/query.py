@@ -93,6 +93,11 @@ class Query:
     # Assume that select will never be called on a key that doesn't exist # This is nice to know
     """
     def select(self, search_key, search_key_index, projected_columns_index):
+      # Select wants the latest version so this is select version 0
+      return self.select_version(search_key, search_key_index, projected_columns_index, 0)
+
+
+    def __select_base_records(self, search_key, search_key_index, projected_columns_index):
       records = []
       for rid in self.table.index.locate(search_key_index, search_key):
         page_range_index, base_page_index, slot = self.table.page_directory[rid]
@@ -113,12 +118,45 @@ class Query:
     # Assume that select will never be called on a key that doesn't exist
     """
     def select_version(self, search_key, search_key_index, projected_columns_index, relative_version):
-      records = self.select(search_key, search_key_index, projected_columns_index)
+      records = self.__select_base_records(search_key, search_key_index, projected_columns_index)
       version_records = [] # To store the wanted versions of the records
 
-      for record in records:
-        if record.indirection == 0: # This means it is a base record so there is no other versions
-          version_records.append(record)
+      for base_record in records:
+        if base_record.indirection == 0: # This means it is a base record so there is no other versions
+          version_records.append(base_record)
+        else: # There are some tail records
+          # Version 0 is the latest version
+          version_num = 0
+          current_rid = base_record.indirection
+          page_range_index, tail_index, tail_slot = self.table.page_directory[current_rid]
+          return_base_record = False
+          # Get the tail record
+          tail_record = self.table.page_ranges[page_range_index].read_tail_record(tail_index, tail_slot, projected_columns_index)
+          # if the indirection for the tail record is the base record rid we hit the end, so just return the base record
+          # else combine the data from the latest tail with columns that haven't been updated in base.
+          while version_num > relative_version:
+            if tail_record[config.INDIRECTION_COLUMN] == base_record.rid:
+              return_base_record = True
+              break
+            current_rid = tail_record[config.INDIRECTION_COLUMN]
+            page_range_index, tail_index, tail_slot = self.table.page_directory[current_rid]
+            tail_record = self.table.page_ranges[page_range_index].read_tail_record(tail_index, tail_slot,
+                                                                                    projected_columns_index)
+            version_num -= 1
+
+          # relative_version < version_num means that we ran out of versions to traverse
+          if return_base_record or relative_version < version_num:
+            version_records.append(base_record)
+          else:
+            for i, data in enumerate(self.__number_to_bit_array(tail_record[config.SCHEMA_ENCODING_COLUMN], self.table.num_columns)):
+              # Only add in the updated data
+              if data == 1:
+                base_record.columns[i] = tail_record[4 + i]
+
+          version_records.append(base_record)
+
+
+
 
       return version_records
 

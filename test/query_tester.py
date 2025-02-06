@@ -109,6 +109,18 @@ class MyTestCase(unittest.TestCase):
     self.assertEqual(record.schema_encoding, [0, 1, 1, 1])
     self.assertEqual(record.indirection, 3)
 
+    record = query.select_version(1, 0, [1, 1, 1, 1], 0)[0]
+    self.assertEqual(record.columns, [1, 5, 5, 7])
+
+    record = query.select_version(1, 0, [1, 1, 1, 1], -1)[0]
+    self.assertEqual(record.columns, [1, 2, 5, 7])
+
+    record = query.select_version(1, 0, [1, 1, 1, 1], -2)[0]
+    self.assertEqual(record.columns, [1, 2, 3, 4])
+
+    record = query.select_version(1, 0, [1, 1, 1, 1], -10)[0]
+    self.assertEqual(record.columns, [1, 2, 3, 4])
+
 
 
 if __name__ == '__main__':
