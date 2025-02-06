@@ -99,7 +99,12 @@ class Query:
 
     def __select_base_records(self, search_key, search_key_index, projected_columns_index):
       records = []
-      for rid in self.table.index.locate(search_key_index, search_key):
+      rids = self.table.index.locate(search_key_index, search_key)
+
+      if rids is None:
+        return []
+
+      for rid in rids:
         page_range_index, base_page_index, slot = self.table.page_directory[rid]
         # We know we can read from a base record because the rid in a page directory points to a page record
         record_data = self.table.page_ranges[page_range_index].read_base_record(base_page_index, slot, projected_columns_index)
@@ -259,8 +264,25 @@ class Query:
     # Returns the summation of the given range upon success
     # Returns False if no record exists in the given range
     """
+
     def sum(self, start_range, end_range, aggregate_column_index):
-        pass
+      total_sum = 0
+      rids = []
+      for primary_key in range(start_range, end_range + 1):
+        record = self.select(primary_key, self.table.key,
+                                     [1 if i == aggregate_column_index else 0 for i in range(self.table.num_columns)])
+        if record and record is not False:
+          value_to_sum = record[0].columns[aggregate_column_index]
+          if value_to_sum is None:
+            value_to_sum = 0
+          total_sum += value_to_sum
+          rids.append(record)
+
+      if not rids :
+        return False
+
+      return total_sum
+
 
 
     """
@@ -272,8 +294,24 @@ class Query:
     # Returns the summation of the given range upon success
     # Returns False if no record exists in the given range
     """
+
     def sum_version(self, start_range, end_range, aggregate_column_index, relative_version):
-        pass
+      total_sum = 0
+      rids = []
+      for primary_key in range(start_range, end_range + 1):
+        record = self.select_version(primary_key, self.table.key,
+                             [1 if i == aggregate_column_index else 0 for i in range(self.table.num_columns)], relative_version)
+        if record and record is not False:
+          value_to_sum = record[0].columns[aggregate_column_index]
+          if value_to_sum is None:
+            value_to_sum = 0
+          total_sum += value_to_sum
+          rids.append(record)
+
+      if not rids:
+        return False
+
+      return total_sum
 
 
     """
