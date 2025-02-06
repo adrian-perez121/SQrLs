@@ -3,6 +3,8 @@ from lstore.query import Query
 
 from random import choice, randint, sample, seed
 
+import time
+
 db = Database()
 # Create a table  with 5 columns
 #   Student Id and 4 grades
@@ -21,7 +23,7 @@ records = {}
 number_of_records = 1000
 number_of_aggregates = 100
 seed(3562901)
-
+start = time.time()
 for i in range(0, number_of_records):
     key = 92106429 + randint(0, number_of_records)
 
@@ -123,3 +125,6 @@ for c in range(0, grades_table.num_columns):
             print('sum error on [', keys[r[0]], ',', keys[r[1]], ']: ', updated_result, ', correct: ', updated_column_sum)
         else:
             pass
+end = time.time()
+
+print("Total time:", end - start)

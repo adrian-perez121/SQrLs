@@ -254,8 +254,6 @@ class Query:
 
       return True
 
-
-
     """
     :param start_range: int         # Start of the key range to aggregate
     :param end_range: int           # End of the key range to aggregate
@@ -264,7 +262,6 @@ class Query:
     # Returns the summation of the given range upon success
     # Returns False if no record exists in the given range
     """
-
     def sum(self, start_range, end_range, aggregate_column_index):
       total_sum = 0
       rids = []
@@ -284,7 +281,6 @@ class Query:
       return total_sum
 
 
-
     """
     :param start_range: int         # Start of the key range to aggregate
     :param end_range: int           # End of the key range to aggregate
@@ -294,7 +290,6 @@ class Query:
     # Returns the summation of the given range upon success
     # Returns False if no record exists in the given range
     """
-
     def sum_version(self, start_range, end_range, aggregate_column_index, relative_version):
       total_sum = 0
       rids = []
