@@ -130,7 +130,55 @@ class Query:
     # Returns False if no records exist with given key or if the target record cannot be accessed due to 2PL locking
     """
     def update(self, primary_key, *columns):
-        pass
+      rids = self.table.index.locate(self.table.key, primary_key)
+
+      if rids == None:
+        return False
+
+      for rid in rids:
+        page_range_index, base_page_index, base_slot = self.table.page_directory[rid]
+        page_range = self.table.page_ranges[page_range_index]
+        base_record = page_range.read_base_record(base_page_index, base_slot, [0] * self.table.num_columns)
+
+        if base_record[config.INDIRECTION_COLUMN] == 0:
+          tail_rid = self.table.new_rid()
+          updated_schema_encoding = [0] * self.table.num_columns
+
+          # Set ones for the changed things
+          for i, data in enumerate(columns):
+            if data != None:
+              updated_schema_encoding[i] = 1
+          schema_encoding_num = self.__bit_array_to_number(updated_schema_encoding)
+
+          record_data = self.create_metadata(tail_rid, base_record[config.RID_COLUMN], self.__bit_array_to_number(updated_schema_encoding))
+          for data in columns:
+            if data != None:
+              record_data.append(data)
+            else:
+              record_data.append(0)
+
+          tail_index, tail_slot = page_range.write_tail_record(record_data)
+          self.table.page_directory[tail_rid] = (page_range_index, tail_index, tail_slot)
+          page_range.update_base_record_column(base_page_index, base_slot, config.INDIRECTION_COLUMN, tail_rid)
+          page_range.update_base_record_column(base_page_index, base_slot, config.SCHEMA_ENCODING_COLUMN, schema_encoding_num)
+
+        # From here there are two cases...
+        # Case 1: We only have a base record (aka indirection is 0)
+        # - make a tail record
+        # - update the indirection of the base record
+        # - make indirection of the tail record be the base record
+        # - update the schema encoding of the base the record as well
+        # Case 2: We have a tail record, (aka indirection is not 0)
+        # - get to that tail record
+        # - make a tail record
+        # - still update the indirection of the base record
+        # - get the tail record and add updates to it
+        # - change indirection of base record to point to new base record
+
+
+
+      return True
+
 
 
     """

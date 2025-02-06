@@ -71,7 +71,7 @@ class Index:
       # Search down an index for a specific set of RIDs. If it's not found, then it doesn't exist
       tree = self.indices[column]
       if value not in tree:
-        raise Exception("Searching for a key that does not exist")
+        return None
 
       return tree[value] # For now this returns a set of RIDs
 

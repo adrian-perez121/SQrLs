@@ -70,6 +70,26 @@ class MyTestCase(unittest.TestCase):
       record = query.select_version(pk, 0, [1, 1, 1], 0)[0]
       self.assertEqual(record_data, record.columns)
 
+  def test_update(self):
+    table = Table("test", 3, 0)
+    query = Query(table)
+    used_pks = set()
+    rid = 1
+    for i in range(5):
+      pk = random.randint(1, 1000)
+      while pk in used_pks:
+        pk = random.randint(1, 1000)
+      used_pks.add(pk)
+      record_data = [pk, random.randint(0, 20), random.randint(0, 20)]
+      query.insert(*record_data)
+      query.update(pk, *[pk, 0, 0])
+      rid += 1 # Tail RID
+      self.assertTrue(rid in table.page_directory)
+      record = query.select(pk, 0, [1,1,1])[0]
+      self.assertEqual(record.schema_encoding, [1, 1, 1]) # Everything should have been updated
+      self.assertEqual(record.indirection, rid) # Indirection should point to tail record
+      rid += 1
+
 
 
 
