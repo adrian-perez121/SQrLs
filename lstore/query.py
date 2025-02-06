@@ -150,7 +150,7 @@ class Query:
               updated_schema_encoding[i] = 1
           schema_encoding_num = self.__bit_array_to_number(updated_schema_encoding)
 
-          record_data = self.create_metadata(tail_rid, base_record[config.RID_COLUMN], self.__bit_array_to_number(updated_schema_encoding))
+          record_data = self.create_metadata(tail_rid, base_record[config.RID_COLUMN], schema_encoding_num)
           for data in columns:
             if data != None:
               record_data.append(data)
@@ -161,6 +161,38 @@ class Query:
           self.table.page_directory[tail_rid] = (page_range_index, tail_index, tail_slot)
           page_range.update_base_record_column(base_page_index, base_slot, config.INDIRECTION_COLUMN, tail_rid)
           page_range.update_base_record_column(base_page_index, base_slot, config.SCHEMA_ENCODING_COLUMN, schema_encoding_num)
+        else:
+          # The base record has a tail record. This is the cumulative implementation.
+          # v Contains all the columns that have been updated so far v
+          base_record_updated_schema_encoding = self.__number_to_bit_array(base_record[config.SCHEMA_ENCODING_COLUMN], self.table.num_columns)
+          latest_tail_rid = base_record[config.INDIRECTION_COLUMN]
+          page_range_index, latest_tail_index, latest_tail_slot = self.table.page_directory[latest_tail_rid]
+
+          latest_tail_record = page_range.read_tail_record(latest_tail_index, latest_tail_slot, base_record_updated_schema_encoding)
+          new_tail_rid = self.table.new_rid()
+
+          for i, data in enumerate(columns):
+            if data != None: # Combining schema encodings
+              base_record_updated_schema_encoding[i] = 1
+          tail_schema_encoding_num = self.__bit_array_to_number(base_record_updated_schema_encoding)
+
+          new_tail_record_data = self.create_metadata(new_tail_rid, latest_tail_rid, tail_schema_encoding_num)
+          for i, data in enumerate(columns):
+            if data != None:
+              new_tail_record_data.append(data)
+            elif latest_tail_record[i + 4]: # If there's data actually there
+              new_tail_record_data.append(latest_tail_record[i + 4]) # Offset for metadata columns
+            else:
+              new_tail_record_data.append(0)
+
+          new_tail_index, new_tail_slot = page_range.write_tail_record(new_tail_record_data)
+          self.table.page_directory[new_tail_rid] = (page_range_index, new_tail_index, new_tail_slot)
+          page_range.update_base_record_column(base_page_index, base_slot, config.INDIRECTION_COLUMN, new_tail_rid)
+          page_range.update_base_record_column(base_page_index, base_slot, config.SCHEMA_ENCODING_COLUMN,
+                                               tail_schema_encoding_num)
+
+
+
 
         # From here there are two cases...
         # Case 1: We only have a base record (aka indirection is 0)

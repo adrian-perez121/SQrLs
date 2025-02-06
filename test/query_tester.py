@@ -90,6 +90,24 @@ class MyTestCase(unittest.TestCase):
       self.assertEqual(record.indirection, rid) # Indirection should point to tail record
       rid += 1
 
+  def test_update_same_record(self):
+    table = Table("test", 4, 0)
+    query = Query(table)
+    query.insert(*[1,2,3,4])
+
+    record = query.select(1, 0, [0, 0, 0, 0])[0]
+    self.assertEqual(record.schema_encoding, [0, 0, 0, 0])
+    self.assertEqual(record.indirection, 0)
+    query.update(1, *[None, None, 5, 7])
+
+    record = query.select(1, 0, [0, 0, 0, 0])[0]
+    self.assertEqual(record.schema_encoding, [0, 0, 1, 1])
+    self.assertEqual(record.indirection, 2)
+    query.update(1, *[None, 5, None, None])
+
+    record = query.select(1, 0, [0, 0, 0, 0])[0]
+    self.assertEqual(record.schema_encoding, [0, 1, 1, 1])
+    self.assertEqual(record.indirection, 3)
 
 
 
