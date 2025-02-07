@@ -15,8 +15,8 @@ class Query:
     Any query that crashes (due to exceptions) should return False
     """
     def __init__(self, table):
-        self.table = table
-        pass
+      self.table = table
+      pass
 
     def create_metadata(self, rid, indirection = 0, schema = 0):
       """
@@ -39,7 +39,7 @@ class Query:
     # Return False if record doesn't exist or is locked due to 2PL
     """
     def delete(self, primary_key):
-        pass
+      self.table.delete(primary_key)
 
 
     """
@@ -96,7 +96,23 @@ class Query:
       # Select wants the latest version so this is select version 0
       return self.select_version(search_key, search_key_index, projected_columns_index, 0)
 
+    def __select_base_records(self, search_key, search_key_index, projected_columns_index):
+      records = []
+      rids = self.table.index.locate(search_key_index, search_key)
 
+      if not rids:
+        return records  # Return early if no records exist
+
+        # Step 1: Preload all relevant page directory entries
+      page_info = {rid: self.table.page_directory[rid] for rid in rids}  # Batch load page directory
+
+        # Step 2: Batch read base records
+      for rid, (page_range_index, base_page_index, slot) in page_info.items():
+        record_data = self.table.page_ranges[page_range_index].read_base_record(base_page_index, slot, projected_columns_index)
+        record = self.__build_record(record_data, search_key)
+        records.append(record)
+      return records
+    """
     def __select_base_records(self, search_key, search_key_index, projected_columns_index):
       records = []
       rids = self.table.index.locate(search_key_index, search_key)
@@ -112,7 +128,7 @@ class Query:
         records.append(record)
 
       return records
-    """
+      
     # Read matching record with specified search key
     # :param search_key: the value you want to search based on
     # :param search_key_index: the column index you want to search based on
@@ -122,36 +138,88 @@ class Query:
     # Returns False if record locked by TPL
     # Assume that select will never be called on a key that doesn't exist
     """
+    
     def select_version(self, search_key, search_key_index, projected_columns_index, relative_version):
       records = self.__select_base_records(search_key, search_key_index, projected_columns_index)
-      version_records = [] # To store the wanted versions of the records
+      version_records = []  # Store final records
 
       for base_record in records:
+        if base_record.indirection == 0:  # No tail records exist
+          version_records.append(base_record)
+          continue
+
+        # Step 1: Preload all tail records into a dictionary
+        tail_cache = {}  
+        current_rid = base_record.indirection
+        return_base_record = False
+
+        while current_rid in self.table.page_directory:
+          page_range_index, tail_index, tail_slot = self.table.page_directory[current_rid]
+          tail_record = self.table.page_ranges[page_range_index].read_tail_record(
+          tail_index, tail_slot, projected_columns_index)
+          
+          tail_cache[current_rid] = tail_record  # Store in cache
+                
+          if tail_record[config.INDIRECTION_COLUMN] == base_record.rid:
+            break  # Stop if we hit the base record
+          
+          current_rid = tail_record[config.INDIRECTION_COLUMN]
+
+        # Step 2: Walk back through versions to get the requested version
+        version_keys = list(tail_cache.keys())[::-1]  # Reverse order to get latest versions first
+        version_count = 0
+        selected_record = base_record  # Default to base record
+
+        for rid in version_keys:
+          if version_count == relative_version:
+            selected_record = tail_cache[rid]
+            break
+          version_count += 1
+
+        # Step 3: Merge updated columns efficiently
+        if selected_record != base_record:
+          schema_encoding = self.__number_to_bit_array(selected_record[config.SCHEMA_ENCODING_COLUMN], self.table.num_columns)
+          new_columns = base_record.columns[:]  # Copy base columns
+          for i, data in enumerate(schema_encoding):
+            if data == 1:
+              new_columns[i] = selected_record[4 + i]  # Only update modified columns
+                
+          base_record.columns = new_columns  # Assign updated columns
+
+        version_records.append(base_record)
+
+      return version_records
+      """
+      records = self.__select_base_records(search_key, search_key_index, projected_columns_index)
+      #print(records) -> maybe select_base_records could be increasing the time?
+      version_records = [] # To store the wanted versions of the records
+
+      for base_record in records: # loops through each record from whatever was retrieved in select_base_records
         if base_record.indirection == 0: # This means it is a base record so there is no other versions
           version_records.append(base_record)
         else: # There are some tail records
           # Version 0 is the latest version
           version_num = 0
-          current_rid = base_record.indirection
+          current_rid = base_record.indirection # indirection holds the RID of the latest tail record -> current
           page_range_index, tail_index, tail_slot = self.table.page_directory[current_rid]
           return_base_record = False
           # Get the tail record
           tail_record = self.table.page_ranges[page_range_index].read_tail_record(tail_index, tail_slot, projected_columns_index)
           # if the indirection for the tail record is the base record rid we hit the end, so just return the base record
           # else combine the data from the latest tail with columns that haven't been updated in base.
-          while version_num > relative_version:
-            if tail_record[config.INDIRECTION_COLUMN] == base_record.rid:
-              return_base_record = True
-              break
-            current_rid = tail_record[config.INDIRECTION_COLUMN]
-            page_range_index, tail_index, tail_slot = self.table.page_directory[current_rid]
+          while version_num < relative_version: # while the current version is less than the version we want
+            if tail_record[config.INDIRECTION_COLUMN] == base_record.rid: # if the tail record = base record
+              return_base_record = True # then we know this is the oldest version
+              current_rid = tail_record[config.INDIRECTION_COLUMN]
+              
+            page_range_index, tail_index, tail_slot = self.table.page_directory[current_rid] # restore the old version by updating the page range index, tail index, and tail slot to the old index 
             tail_record = self.table.page_ranges[page_range_index].read_tail_record(tail_index, tail_slot,
                                                                                     projected_columns_index)
             version_num -= 1
 
           # relative_version < version_num means that we ran out of versions to traverse
           if return_base_record or relative_version < version_num:
-            version_records.append(base_record)
+            version_records.append(base_record) # then append the base record
           else:
             for i, data in enumerate(self.__number_to_bit_array(tail_record[config.SCHEMA_ENCODING_COLUMN], self.table.num_columns)):
               # Only add in the updated data
@@ -160,14 +228,10 @@ class Query:
 
           version_records.append(base_record)
 
-
-
-
       return version_records
+      """
 
-
-
-    """
+      """
     # Update a record with specified key and columns
     # Returns True if update is succesful
     # Returns False if no records exist with given key or if the target record cannot be accessed due to 2PL locking
@@ -279,7 +343,6 @@ class Query:
         return False
 
       return total_sum
-
 
     """
     :param start_range: int         # Start of the key range to aggregate
