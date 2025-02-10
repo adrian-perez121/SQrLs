@@ -103,4 +103,3 @@ class ConceptualPage:
     physical_page_slot = slot % 512
     self.pages[column][physical_page_level].write(new_indirection, physical_page_slot)
 
-

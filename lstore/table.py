@@ -42,5 +42,3 @@ class Table:
     def __merge(self):
         print("merge is happening")
         pass
-
-

@@ -40,4 +40,3 @@ class Transaction:
     def commit(self):
         # TODO: commit to database
         return True
-

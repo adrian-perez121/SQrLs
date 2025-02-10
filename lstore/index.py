@@ -104,4 +104,3 @@ class Index:
       # just use del self.indices[column_number], though we shouldn't be allowed to delete the primary key column
         pass
 
-
