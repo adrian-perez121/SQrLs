@@ -39,6 +39,14 @@ class Query:
     # Return False if record doesn't exist or is locked due to 2PL
     """
     def delete(self, primary_key):
+        # Get all the RIDs that can be found with the primary key from the index
+        # for each RID in in RIDs
+        #   - find its base record
+        #   - update the RID column in the base record to be 0 (special NULL value)
+        #   - Use the indirection column to find any tail records
+        #   - This process of traversing is similar to how select version works (so make sure to save your base RID in a variable)
+        #   - For the tail records, update their RID columns to be 0
+        # Once the indirection matches the base rid youre done.
         pass
 
 
