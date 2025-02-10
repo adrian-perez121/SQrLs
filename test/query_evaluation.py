@@ -140,7 +140,7 @@ if __name__ == "__main__":
     column_index = 2
 
     # generate test data
-    for num_records in [100, 1000, 10000, 100000]:
+    for num_records in [100, 1000, 10000, 100000, 1000000]:
         evaluate_insert(query, num_records, num_columns)
         evaluate_update(query, num_records, column_index)
         evaluate_select(query, num_records, column_index)
