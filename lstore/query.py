@@ -40,7 +40,7 @@ class Query:
     """
     def delete(self, primary_key):
         # After your all done, remove the primary key from the primary key index
-        rids = self.table.index.locate(self.table.key, primary_key)
+        rids = self.table.index.locate(self.table.key, primary_key).copy()
 
         if not rids:
           return False
@@ -48,7 +48,7 @@ class Query:
         for rid in rids:
           page_range_index, base_page_index, base_slot = self.table.page_directory[rid]
           page_range = self.table.page_ranges[page_range_index]
-          base_record = page_range.read_base_record(base_page_index, base_slot, [0] * self.table.num_columns)
+          base_record = page_range.read_base_record(base_page_index, base_slot, [1] * self.table.num_columns)
 
           if page_range_index is None:
             return False
@@ -58,17 +58,18 @@ class Query:
 
           current_rid = base_record[config.INDIRECTION_COLUMN]
           while current_rid and current_rid != base_rid:
-            page_range_index, tail_index, tail_slot = self.table.page_directory[rid]
+            page_range_index, tail_index, tail_slot = self.table.page_directory[current_rid]
             if page_range_index is None:
               break
-            tail_record = self.table.page_range[page_range_index].read_tail_record(tail_index, tail_slot,
+            tail_record = self.table.page_ranges[page_range_index].read_tail_record(tail_index, tail_slot,
                                                                                    [0] * self.table.num_columns)
 
-            self.table.page_range[page_range_index].update_tail_record_column(tail_index, tail_slot, config.RID_COLUMN,
+            self.table.page_ranges[page_range_index].update_tail_record_column(tail_index, tail_slot, config.RID_COLUMN,
                                                                               0)
             current_rid = tail_record[config.INDIRECTION_COLUMN]
 
-          self.table.index.remove(primary_key, rid)
+          self.table.index.delete(base_record)
+          # self.table.index.remove(primary_key, rid)
           self.table.page_directory[rid] = None
 
         return True
