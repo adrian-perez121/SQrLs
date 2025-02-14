@@ -15,7 +15,7 @@ class Query:
     Any query that crashes (due to exceptions) should return False
     """
     def __init__(self, table):
-        self.table = table
+        self.table: Table = table
         pass
 
     def create_metadata(self, rid, indirection = 0, schema = 0):
@@ -39,7 +39,6 @@ class Query:
     # Return False if record doesn't exist or is locked due to 2PL
     """
     def delete(self, primary_key):
-        # After your all done, remove the primary key from the primary key index
         rids = self.table.index.locate(self.table.key, primary_key).copy()
 
         if not rids:
@@ -55,17 +54,15 @@ class Query:
 
           base_rid = rid
           page_range.update_base_record_column(base_page_index, base_slot, config.RID_COLUMN, 0)
-
           current_rid = base_record[config.INDIRECTION_COLUMN]
+
           while current_rid and current_rid != base_rid:
             page_range_index, tail_index, tail_slot = self.table.page_directory[current_rid]
             if page_range_index is None:
               break
-            tail_record = self.table.page_ranges[page_range_index].read_tail_record(tail_index, tail_slot,
-                                                                                   [0] * self.table.num_columns)
+            tail_record = self.table.page_ranges[page_range_index].read_tail_record(tail_index, tail_slot, [0] * self.table.num_columns)
 
-            self.table.page_ranges[page_range_index].update_tail_record_column(tail_index, tail_slot, config.RID_COLUMN,
-                                                                              0)
+            self.table.page_ranges[page_range_index].update_tail_record_column(tail_index, tail_slot, config.RID_COLUMN, 0)
             current_rid = tail_record[config.INDIRECTION_COLUMN]
 
           self.table.index.delete(base_record)
@@ -115,6 +112,28 @@ class Query:
         self.table.add_new_page_range()
 
         return True
+      
+    def _insert_experiment(self, *columns):
+      if len(columns) != self.table.num_columns: # Thread Safe
+        return False # Thread Safe
+
+      rid = self.table.new_rid()
+      page_range = self.table.page_ranges[self.table.page_ranges_index]  # Get a page range we can write into
+
+      # Create an array with the metadata columns, and then add in the regular data columns
+      new_record = self.create_metadata(rid)
+      for data in columns:
+        new_record.append(data)
+      # - write this record into the table
+      index, slot = page_range.write_base_record(new_record)
+      # - add the RID and location into the page directory
+      self.table.page_directory[rid] = (self.table.page_ranges_index, index, slot)
+      self.table.index.add(new_record)
+    # - add the record in the index
+
+      self.table.add_new_page_range()
+
+      return True
 
     """
     # Read matching record with specified search key
@@ -299,8 +318,7 @@ class Query:
       total_sum = 0
       rids = []
       for primary_key in range(start_range, end_range + 1):
-        record = self.select(primary_key, self.table.key,
-                                     [1 if i == aggregate_column_index else 0 for i in range(self.table.num_columns)])
+        record = self.select(primary_key, self.table.key, [1 if i == aggregate_column_index else 0 for i in range(self.table.num_columns)])
         if record and record is not False:
           value_to_sum = record[0].columns[aggregate_column_index]
           if value_to_sum is None:
@@ -327,8 +345,7 @@ class Query:
       total_sum = 0
       rids = []
       for primary_key in range(start_range, end_range + 1):
-        record = self.select_version(primary_key, self.table.key,
-                             [1 if i == aggregate_column_index else 0 for i in range(self.table.num_columns)], relative_version)
+        record = self.select_version(primary_key, self.table.key, [1 if i == aggregate_column_index else 0 for i in range(self.table.num_columns)], relative_version)
         if record and record is not False:
           value_to_sum = record[0].columns[aggregate_column_index]
           if value_to_sum is None:
