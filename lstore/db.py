@@ -4,13 +4,14 @@ import lstore.config
 class Database():
 
     def __init__(self):
-        self.tables = {}
+        self.tables: dict[str, Table] = {}
 
-    # Not required for milestone1
     def open(self, path):
+        # TODO: Initialize a Bufferpool object
         pass
 
     def close(self):
+        # TODO: Run on close for bufferpool
         pass
 
     """
@@ -19,7 +20,7 @@ class Database():
     :param num_columns: int     #Number of Columns: all columns are integer
     :param key: int             #Index of table key in columns
     """
-    def create_table(self, name, num_columns, key_index):
+    def create_table(self, name: str, num_columns: int, key_index: int):
         if name in self.tables:
             raise  "Table already exists"
 

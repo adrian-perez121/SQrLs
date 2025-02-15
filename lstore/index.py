@@ -1,4 +1,4 @@
-from BTrees.OOBTree import OOBTree
+from BTrees._OOBTree import OOBTree
 import lstore.config as config
 """
 A data strucutre holding indices for various columns of a table. Key column should be indexd by default, other columns can be indexed through this object. Indices are usually B-Trees, but other data structures can be used as well.
@@ -35,7 +35,7 @@ class Index:
       for i, column_index in enumerate(self.indices):
         # We have to do i + 4 because the first 4 columns are metadata columns. In other words, I am aligning
         key = record[i + 4]
-        if column_index != None:
+        if column_index is not None:
 
           # If we are going to allow duplicate values we should store RIDs in a set. RIDs are for certain unique
           if key not in column_index:
@@ -52,7 +52,7 @@ class Index:
       """
       rid = record[config.RID_COLUMN]
       for i, column_index in enumerate(self.indices):
-        if column_index != None:
+        if column_index is not None:
           key = record[i + 4]
           if key in column_index:
             # Recall the tree keys are SETs with RIDs
