@@ -34,21 +34,28 @@ class BufferPool:
     def request_record():
         pass
     
+    # assign and return
     def request_page(self):
         self.page_request_count += 1
-        page: MemoryPage = None
+        page = MemoryPage(self.page_request_count)
+        self.memory_pages.append(page)
+        return page
         
-        page.request_count += 1
-        pass
+        #page.request_count += 1
+        #pass
     
-    def has_capacity():
-        pass
+    def has_capacity(self):
+        return len(self.memory_pages) < self.capacity
     
-    def write_page():
-        pass
+    # sim writing to disk
+    def write_page(self, page):
+        page.is_dirty = False
+        file_path = os.path.join(self.dir, f"page_{page.position}.txt")
+        with open(file_path, "w") as f:
+            f.write(f"MemoryPage {page.position} saved. \n")
     
     def get_least_needed_page(self, memory_pages):
-        sorted_pages = sorted(memory_pages, key=MemoryPage.request_count)
+        sorted_pages = sorted(memory_pages, key=lambda page: page.request_count)
         stop_index = 0
         least_requests = 0
         for i, page in enumerate(sorted_pages):
@@ -58,24 +65,36 @@ class BufferPool:
                 stop_index = i
                 break
             
-        sorted_pages = sorted(sorted_pages[0:stop_index], key=MemoryPage.last_accessed)
+        sorted_pages = sorted(sorted_pages[:stop_index], key=lambda page: page.last_accessed)
         return None if not sorted_pages else sorted_pages[0]
             
     
     def evict_page(self, memory_pages):
         # If Page Dirty, write to Disk
-        if memory_pages and not self.has_capacity():
+        if not self.has_capacity():
             useless_page = self.get_least_needed_page(memory_pages)
+            if useless_page is None:
+                return
             if useless_page.is_dirty:
-                
-                if useless_page.pins:
+                self.write_page(useless_page)
+            self.memory_pages.remove(useless_page) # remove evicted
+
+
+    #def evict_page(self, memory_pages):
+        # If Page Dirty, write to Disk
+        #if not self.has_capacity():
+            #useless_page = self.get_least_needed_page(memory_pages)
+            #if useless_page.is_dirty:
+                #self.write_page(useless_page)
+                #if useless_page.pins:
                     # M3: Try to evict something else
-                    self.write_page(useless_page)
-                    memory_pages[*useless_page.position] = MemoryPage() # M3: SUBMIT / QUEUE IT / ON PINS = 0 -> RUN
-                else:
-                    self.write_page(useless_page)
-                    memory_pages[*useless_page.position] = MemoryPage()
-        pass
+                    #self.write_page(useless_page)
+                    #memory_pages[useless_page.position] = MemoryPage(useless_page.position) # M3: SUBMIT / QUEUE IT / ON PINS = 0 -> RUN
+                #else:
+                    #self.write_page(useless_page)
+                    #memory_pages[useless_page.position] = MemoryPage(useless_page.position)
+            #self.memory_pages.remove(useless_page)
+        #pass    
     
     def on_close(self, memory_pages):
         for page in memory_pages:
