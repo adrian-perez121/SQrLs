@@ -1,14 +1,23 @@
 from lstore.table import Table
 import lstore.config
+import os
+import pickle
 
 class Database():
 
     def __init__(self):
-        self.tables: dict[str, Table] = {}
+        self.tables = {}
+        self.start_path = None
 
+    # Required for milestone2
     def open(self, path):
         # TODO: Initialize a Bufferpool object
-        pass
+        if os.path.exists(path):
+            print(f"Directory '{path}' already exists")
+        else:
+            self.start_path = path
+            os.makedirs(path, exist_ok=True)
+            os.makedirs(path + "/Tables", exist_ok=True)
 
     def close(self):
         # TODO: Run on close for bufferpool
@@ -20,7 +29,7 @@ class Database():
     :param num_columns: int     #Number of Columns: all columns are integer
     :param key: int             #Index of table key in columns
     """
-    def create_table(self, name: str, num_columns: int, key_index: int):
+    def create_table(self, name, num_columns, key_index):
         if name in self.tables:
             raise  "Table already exists"
 
