@@ -25,7 +25,7 @@ class Table:
         self.page_ranges_index = 0
         self.page_directory = {}
         self.index = Index(self)
-        self.rid = Atomic(1)
+        self.rid = 1
         pass
 
     def new_rid(self):
