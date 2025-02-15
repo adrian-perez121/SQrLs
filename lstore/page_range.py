@@ -9,11 +9,11 @@ class PageRange:
     self.regular_columns = num_columns
     self.total_columns = self.meta_data_columns + self.regular_columns
     self.base_pages = [ConceptualPage(num_columns)]
-    self.base_pages_index = 0 # M3: TODO: Atomize
-    self.base_pages_slot = 0 # M3: TODO: Atomize
+    self.base_pages_index = 0
+    self.base_pages_slot = 0
     self.tail_pages = [ConceptualPage(num_columns)]
-    self.tail_pages_index = 0 # M3: TODO: Atomize
-    self.tail_pages_slot = 0 # M3: TODO: Atomize
+    self.tail_pages_index = 0
+    self.tail_pages_slot = 0
     self.tail_page_directory = {}
 
   def has_base_page_capacity(self):

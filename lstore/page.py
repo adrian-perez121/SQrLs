@@ -28,7 +28,6 @@ class Page:
 
 
   def read(self, slot):
-    if slot > 512 or slot < 0 or slot >= self.num_records:
-      raise IndexError("Index out of range")
+    if slot > 512 or slot < 0 or slot >= self.num_records: raise IndexError("Index out of range")
 
     return int.from_bytes(self.data[slot * 8: (slot + 1) * 8], byteorder='big')
