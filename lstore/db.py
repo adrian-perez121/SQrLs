@@ -1,17 +1,35 @@
 from lstore.table import Table
 import lstore.config
+import os
+import pickle
+
+from lstore.bufferpool import BufferPool
 
 class Database():
 
     def __init__(self):
         self.tables = {}
+        self.start_path = None
 
-    # Not required for milestone1
+    # Required for milestone2
     def open(self, path):
-        pass
+        # TODO: Initialize a Bufferpool object
+        if os.path.exists(path):
+            print(f"Directory '{path}' already exists")
+        else:
+            self.start_path = path
+            os.makedirs(path, exist_ok=True)
+            os.makedirs(path + "/Tables", exist_ok=True)
 
+        self.bufferpool = BufferPool(path)
+        
     def close(self):
-        pass
+        # TODO: Run on close for bufferpool
+        if hasattr(self, "bufferpool"):
+            self.bufferpool.on_close(self.bufferpool.memory_pages)  # flush
+            print("All pages flushed to disk.")
+        print("Database closed successfully.")
+
 
     """
     # Creates a new table

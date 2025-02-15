@@ -31,7 +31,7 @@ class BufferPool:
         self.files = {file: os.path.join(dir, file) for file in os.listdir(dir)}
         pass
     
-    def request_record():
+    def request_record(self):
         pass
     
     # assign and return
