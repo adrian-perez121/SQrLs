@@ -3,6 +3,8 @@ from lstore.query import Query
 
 from random import choice, randint, sample, seed
 
+import time
+
 db = Database()
 db.open('./ECS165')
 # Create a table  with 5 columns
@@ -24,7 +26,7 @@ number_of_aggregates = 100
 number_of_updates = 1
 
 seed(3562901)
-
+start = time.time()
 for i in range(0, number_of_records):
     key = 92106429 + i
     records[key] = [key, randint(0, 20), randint(0, 20), randint(0, 20), randint(0, 20)]
@@ -81,4 +83,7 @@ for i in range(0, number_of_aggregates):
         pass
         # print('sum on [', keys[r[0]], ',', keys[r[1]], ']: ', column_sum)
 print("Aggregate finished")
+
 db.close()
+end = time.time()
+print("Total time:", end - start)

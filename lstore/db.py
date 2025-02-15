@@ -21,6 +21,7 @@ class Database():
 
     def close(self):
         # TODO: Run on close for bufferpool
+        # 
         pass
 
     """

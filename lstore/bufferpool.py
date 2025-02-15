@@ -28,8 +28,17 @@ class BufferPool:
         self.files = {file: os.path.join(dir, file) for file in os.listdir(dir)}
         pass
     
-    def request_record():
-        pass
+    def request_record(self):
+        # if the page is not in the bufferpool currently, bring the requested page into bufferpool
+        # if bufferpool is full, evict page to read the new page
+        print("Requested Record")
+        if not self.has_capacity():
+            self.evict_page(self.memory_pages)
+            print("Not enough capacity => page evicted")
+            # read new page
+        else:
+            # bring page into bufferpool
+            pass
     
     def request_page(self):
         self.page_request_count += 1
@@ -38,10 +47,18 @@ class BufferPool:
         page.request_count += 1
         pass
     
-    def has_capacity():
+    def has_capacity(self):
+        if len(self.memory_pages) <= self.capacity:
+            return True
+        else: return False
+    
+    def write_page(self):
         pass
     
-    def write_page():
+    def is_pinned(self):
+        # determine whether or not our page is pinned (currently being used)
+        # 
+        # return bool 
         pass
     
     def get_least_needed_page(self, memory_pages):

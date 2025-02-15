@@ -25,14 +25,13 @@ class Table:
         self.page_ranges_index = 0
         self.page_directory = {}
         self.index = Index(self)
-        self.rid = Atomic(1)
+        self.rid = 1
         pass
 
     def new_rid(self):
-      def get_current_rid_and_increment(self):
-        tmp = self.rid
-        return self.rid + 1
-      self.rid.modify
+      tmp = self.rid
+      self.rid += 1
+      return tmp
       
 
     def add_new_page_range(self):
