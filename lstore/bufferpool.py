@@ -1,7 +1,7 @@
-
 import os
 import sys
 import time
+import pickle # for serialization
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))) # maybe window/vsc issue?
 
@@ -34,70 +34,85 @@ class BufferPool:
     def request_record(self):
         pass
     
-    # assign and return
-    def request_page(self):
-        self.page_request_count += 1
-        page = MemoryPage(self.page_request_count)
+    # load from disk or make new
+    def read_page(self, position):
+        file_path = os.path.join(self.dir, f"page_{position}.pkl")
+        if os.path.exists(file_path):
+            with open(file_path, "rb") as f:
+                page_data = pickle.load(f)  # load serialized page
+
+            # mempage from stored attributes
+            page = MemoryPage(position, from_disk=True)
+            page.request_count = page_data["request_count"]
+            page.last_accessed = page_data["last_accessed_page"]
+            # make sure page is clean after writing to disk
+            page.is_dirty = False  
+            page.base_page = page_data["base_page"]
+            page.tail_page = page_data["tail_page"]
+            print(f"Loaded page {position} from disk (is_dirty={page.is_dirty})!")
+
+        else:
+            page = MemoryPage(position)
+            print(f"Created new page at {position}.")
+
         self.memory_pages.append(page)
         return page
-        
-        #page.request_count += 1
-        #pass
+
+    # assign and return
+    def request_page(self, position=None):
+        if position is None:
+            position = self.page_request_count
+            self.page_request_count += 1
+
+        # evcit before adding new
+        self.evict_page()
+
+        # check if in mem
+        for page in self.memory_pages:
+            if page.position == position:
+                return page
+
+        # otherwise read from disk
+        return self.read_page(position)
     
     def has_capacity(self):
         return len(self.memory_pages) < self.capacity
     
-    # sim writing to disk
+    # write to disk
     def write_page(self, page):
-        page.is_dirty = False
-        file_path = os.path.join(self.dir, f"page_{page.position}.txt")
-        with open(file_path, "w") as f:
-            f.write(f"MemoryPage {page.position} saved. \n")
+        file_path = os.path.join(self.dir, f"page_{page.position}.pkl")
+        
+        # using page attributes, metadata + b/t page
+        with open(file_path, "wb") as f:
+            pickle.dump({
+                "position": page.position,
+                "request_count": page.request_count,
+                "last_accessed_page": page.last_accessed,
+                "is_dirty": page.is_dirty,
+                "base_page": page.base_page,
+                "tail_page": page.tail_page,
+            }, f)
+        page.is_dirty = False # clean
+        print(f"Page {page.position} has successfully been written to disk!")
     
     def get_least_needed_page(self, memory_pages):
-        sorted_pages = sorted(memory_pages, key=lambda page: page.request_count)
-        stop_index = 0
-        least_requests = 0
-        for i, page in enumerate(sorted_pages):
-            if i == 0:
-                least_requests = page.request_count
-            if page.request_count > least_requests:
-                stop_index = i
-                break
-            
-        sorted_pages = sorted(sorted_pages[:stop_index], key=lambda page: page.last_accessed)
-        return None if not sorted_pages else sorted_pages[0]
-            
-    
-    def evict_page(self, memory_pages):
-        # If Page Dirty, write to Disk
-        if not self.has_capacity():
-            useless_page = self.get_least_needed_page(memory_pages)
+        if not memory_pages:
+            return None
+        return min(memory_pages, key=lambda page: (page.request_count, page.last_accessed))
+
+    def evict_page(self):
+        while not self.has_capacity():
+            useless_page = self.get_least_needed_page(self.memory_pages)
             if useless_page is None:
-                return
+                return  # none to evict
             if useless_page.is_dirty:
-                self.write_page(useless_page)
-            self.memory_pages.remove(useless_page) # remove evicted
+                self.write_page(useless_page)  # w before evict
+            self.memory_pages.remove(useless_page)
+            print(f"Evicted page {useless_page.position} to maintain capacity.")
 
-
-    #def evict_page(self, memory_pages):
-        # If Page Dirty, write to Disk
-        #if not self.has_capacity():
-            #useless_page = self.get_least_needed_page(memory_pages)
-            #if useless_page.is_dirty:
-                #self.write_page(useless_page)
-                #if useless_page.pins:
-                    # M3: Try to evict something else
-                    #self.write_page(useless_page)
-                    #memory_pages[useless_page.position] = MemoryPage(useless_page.position) # M3: SUBMIT / QUEUE IT / ON PINS = 0 -> RUN
-                #else:
-                    #self.write_page(useless_page)
-                    #memory_pages[useless_page.position] = MemoryPage(useless_page.position)
-            #self.memory_pages.remove(useless_page)
-        #pass    
     
     def on_close(self, memory_pages):
-        for page in memory_pages:
+        for page in self.memory_pages[:]:
             if page.is_dirty:
                 self.write_page(page)
             
