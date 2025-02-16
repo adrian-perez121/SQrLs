@@ -12,6 +12,7 @@ class MemoryPage: # / Frame
         self.position: int = position
         self.base_page: ConceptualPage = None
         self.tail_page: ConceptualPage = None
+        self.pin = 0
 
 class BufferPool:
     
@@ -56,10 +57,10 @@ class BufferPool:
         pass
     
     def is_pinned(self):
-        # determine whether or not our page is pinned (currently being used)
-        # 
+        # determine whether or not the page is pinned (currently being used)
         # return bool 
-        pass
+        return self.memory_pages.pins == 1 # currently in use
+        #pass
     
     def get_least_needed_page(self, memory_pages):
         sorted_pages = sorted(memory_pages, key=MemoryPage.request_count)
