@@ -3,7 +3,6 @@ import time
 from lstore.table import Table
 from lstore.record import Record
 import lstore.config as config
-from lstore.index import Index
 from datetime import datetime
 
 
