@@ -121,6 +121,38 @@ class MyTestCase(unittest.TestCase):
         # make sure that key with indexed on is in the columns
         self.assertEqual(record.columns[2], key)
 
+  def test_index_after_updates(self):
+    table = Table("test_table", 3, 0)
+    query = Query(table)
+    index = table.index
+    old_records = defaultdict(set)
+    new_records = defaultdict(set)
+    pk = 0
+
+    for i in range(20):
+      # Generating unique RIDs and duplicate primary keys {
+      # }
+      record = (pk, random.randint(0, 5), random.randint(0, 5))
+      query.insert(*record)
+      old_records[pk].add(record)
+      pk += 1
+
+    pk = 0
+    for i in range(20):
+      # Generating unique RIDs and duplicate primary keys {
+      # }
+      record = (pk, random.randint(0, 5), random.randint(0, 5))
+      query.update(pk ,*record)
+      new_records[pk].add(record)  # We are going to test with this
+      pk += 1
+
+    for i in range(20):
+      # Make sure the old record is gone and that the update record is there
+      records = query.select(i, 0, [1,1,1])
+      for record in records:
+        self.assertTrue(tuple(record.columns) in new_records[i])
+
+
 
 
 

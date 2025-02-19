@@ -224,7 +224,12 @@ class Query:
     # Returns False if no records exist with given key or if the target record cannot be accessed due to 2PL locking
     """
     def update(self, primary_key, *columns):
+
       rids = self.table.index.locate(self.table.key, primary_key)
+
+      # Now that we have the RIDS, lets remove the old version of the records from our index, but this will
+      # be done after we are done updating
+      old_records = self.select(primary_key, self.table.index.key, [1] * self.table.num_columns)
 
       if rids == None:
         return False
@@ -285,6 +290,20 @@ class Query:
           page_range.update_base_record_column(base_page_index, base_slot, config.SCHEMA_ENCODING_COLUMN,
                                                tail_schema_encoding_num)
 
+        # Now get our newly updated records
+      new_records = self.select(primary_key, self.table.index.key, [1] * self.table.num_columns)
+
+        # Remove the old records from the index and...
+      for record in old_records:
+          full_record = [record.indirection, record.rid, record.timestamp, record.schema_encoding]
+          full_record = full_record + record.columns
+          self.table.index.delete(full_record)
+
+      # add in the new records
+      for record in new_records:
+          full_record = [record.indirection, record.rid, record.timestamp, record.schema_encoding]
+          full_record = full_record + record.columns
+          self.table.index.add(full_record)
 
 
 
