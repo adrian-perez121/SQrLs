@@ -94,6 +94,11 @@ class Query:
         if len(columns) != self.table.num_columns:
           return False
 
+        pk_column = self.table.index.key
+
+        if columns[pk_column] in self.table.index.indices[pk_column]:
+          return False
+
         rid = self.table.new_rid()
         page_range = self.table.page_ranges[self.table.page_ranges_index]  # Get a page range we can write into
 
@@ -224,6 +229,10 @@ class Query:
     # Returns False if no records exist with given key or if the target record cannot be accessed due to 2PL locking
     """
     def update(self, primary_key, *columns):
+      pk_column = self.table.key
+      # You shouldn't be allowed to change the primary key
+      if columns[pk_column] != None and primary_key != columns[pk_column]:
+        return False
 
       rids = self.table.index.locate(self.table.key, primary_key)
 
