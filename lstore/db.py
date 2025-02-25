@@ -1,18 +1,20 @@
+import pickle, os
+from lstore.bufferpool import BufferPool
 from lstore.table import Table
 import lstore.config
-import os
-import pickle
 
 class Database():
 
     def __init__(self):
         self.tables = {}
         self.start_path = None
+        self.bufferpool = None
 
-    # Required for milestone2
     def open(self, path):
         # TODO: Initialize a Bufferpool object
         self.start_path = path
+        self.bufferpool = BufferPool(self.start_path)
+        # TODO: get all frames that were previously active on the last run
 
         if os.path.exists(path):
             with open(path + "/table_names", "rb") as file:
@@ -23,9 +25,7 @@ class Database():
 
     def close(self):
         # TODO: Run on close for bufferpool
-        # Write the hash into a pickle file for later
-        with open(self.start_path + "/table_names", 'wb') as file:
-            pickle.dump(self.tables, file)
+        pass
 
     """
     # Creates a new table
@@ -33,11 +33,11 @@ class Database():
     :param num_columns: int     #Number of Columns: all columns are integer
     :param key: int             #Index of table key in columns
     """
-    def create_table(self, name, num_columns, key_index):
+    def create_table(self, name: str, num_columns: int, key_index: int):
         if name in self.tables:
             raise  "Table already exists"
 
-        table = Table(name, num_columns, key_index)
+        table = Table(name, num_columns, key_index, self.bufferpool)
         self.tables[name] = table
         return table
 
