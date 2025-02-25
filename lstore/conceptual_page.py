@@ -2,6 +2,8 @@ from lstore.page import Page  # Assuming your Page class is defined in page.py
 import lstore.config as config
 import os
 import shutil
+import json
+import base64
 
 class ConceptualPage:
   def __init__(self, num_columns):
@@ -105,75 +107,47 @@ class ConceptualPage:
     physical_page_slot = slot % 512
     self.pages[column][physical_page_level].write(new_indirection, physical_page_slot)
 
-  def dump_file(self, dir_name):
-    # Write over it if the directory exists
-    if os.path.isdir(dir_name):
-      shutil.rmtree(dir_name)
+  def dump_file(self, name):
+    # File will be overwritten if it exists
 
-    os.mkdir(dir_name)
+    data = {}
 
     # Some meta data stuff {
-    with open(f'./{dir_name}/regular_columns', 'wb') as file:
-      file.write(self.regular_columns.to_bytes(8, byteorder='big'))
-
-    with open(f'./{dir_name}/num_records', 'wb') as file:
-      file.write(self.num_records.to_bytes(8, byteorder='big'))
-    # }
+    data["regular_columns"] = self.regular_columns
+    data["metadata_columns"] = self.metadata_columns
+    data["num_records"] = self.num_records
+    # # }
 
     for i, column in enumerate(self.pages):
-      os.mkdir(f'./{dir_name}/' + str(i))
+      data[str(i)] = {}
 
       for j, physical_page in enumerate(column):
-        with open(f'./{dir_name}/' + str(i) + "/" +str(j), 'wb') as file:
-          file.write(physical_page.data)
+        data[str(i)][str(j)] = physical_page.to_json_string()
+
+    with open(f"{name}.json", "w") as file:
+      json.dump(data, file, indent=4)
 
 
   @classmethod
-  def load_file(cls, dir_name):
-    num_columns = None
-    num_records = None
-    with open(f'./{dir_name}/regular_columns', 'rb') as file:
-      num_columns = int.from_bytes(file.read(), byteorder='big')
-
-    with open(f'./{dir_name}/num_records', 'rb') as file:
-      num_records = int.from_bytes(file.read(), byteorder='big')
+  def load_file(cls, json_file_name):
+    data = {}
+    with open(f"{json_file_name}.json") as file:
+      data = json.load(file)
 
 
-    conceptual_page = cls(num_columns)
-    # The last two things were meta data for conceptual page
-    pages_names = sorted(os.listdir(f"./{dir_name}"))[:-2]
+    regular_columns = data["regular_columns"]
+    new_conceptual_page = cls(regular_columns)
+    new_conceptual_page.metadata_columns = data["metadata_columns"]
+    new_conceptual_page.num_records = data["num_records"]
+
     pages = []
-
-    for column in pages_names:
+    for column in range(new_conceptual_page.total_columns):
       pages.append([])
-      column_num = int(column)
-      physical_pages = sorted(os.listdir(f"./{dir_name}/{column}"))
+      for page_num in range(len(data[str(column)])):
+        pages[column].append(Page.from_json_string(data[str(column)][str(page_num)]))
 
-      # add the physical pages into each column
-      for physical_page in physical_pages:
-        page = Page()
-        with open(f"./{dir_name}/{column}/{physical_page}", 'rb') as file:
-         page.data = file.read()
-
-        pages[column_num].append(page)
-
-      full_pages = num_records // 512
-
-      # Change physical page metadata to be correct
-      for i in range(full_pages):
-        pages[column_num][i].num_records = 512
-
-      if num_records == 4096: # Edge case
-        pages[column_num][-1].num_records = 512
-      else: # The last page is the one that was last added to
-        pages[column_num][-1].num_records = num_records % 512
-
-    # Adjust conceptual page meta and return
-    conceptual_page.pages = pages
-    conceptual_page.num_records = num_records
-
-    return conceptual_page
-
+    new_conceptual_page.pages = pages
+    return new_conceptual_page
 
 
 

@@ -1,3 +1,6 @@
+import json
+import base64
+
 class Page:
 
   def __init__(self):
@@ -32,3 +35,17 @@ class Page:
       raise IndexError("Index out of range")
 
     return int.from_bytes(self.data[slot * 8: (slot + 1) * 8], byteorder='big')
+
+  def to_json_string(self):
+    data = {}
+    data["num_records"] = self.num_records
+    data["byte_array"] = base64.b64encode(self.data).decode('utf-8')
+    return json.dumps(data)
+
+  @classmethod
+  def from_json_string(cls, json_data):
+    data = json.loads(json_data)
+    new_page = Page()
+    new_page.data = base64.b64decode(data["byte_array"])
+    new_page.num_records = data["num_records"]
+    return new_page

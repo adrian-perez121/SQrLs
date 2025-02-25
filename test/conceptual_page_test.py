@@ -1,4 +1,5 @@
 # To get the files from lstore
+import os
 import sys
 import shutil
 
@@ -74,7 +75,7 @@ class MyTestCase(unittest.TestCase):
 
       self.assertEqual(test_conceptual_page.num_records, loaded_page.num_records)
 
-    shutil.rmtree("testpage") # clean up
+    os.remove("testpage.json") # clean up
 
 
 
