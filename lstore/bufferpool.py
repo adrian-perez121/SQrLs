@@ -9,7 +9,6 @@ from lstore.conceptual_page import ConceptualPage
 
 
 class MemoryPage:
-    """A representation of an in-memory frame storing base/tail pages."""
 
     def __init__(self, position: int, from_disk: bool = False):
         self.position = position
@@ -20,7 +19,6 @@ class MemoryPage:
         self.tail_page = None  # tail are optional
 
     def mark_accessed(self):
-        """Updates access time and request count."""
         self.last_accessed = time.time()
         self.request_count += 1
 
@@ -54,10 +52,10 @@ class BufferPool:
                 data = bytearray(f.read())  # load bytes
             page = Page()  # create new instance
             page.data = data  # assign
-            print(f"✅ Loaded page {position} from disk.")
+            print(f"Loaded page {position} from disk.")
         else:
             page = Page()
-            print(f"📄 Created new page at position {position}.")
+            print(f"Created new page at position {position}.")
 
         memory_page = MemoryPage(position, from_disk=os.path.exists(file_path))
         memory_page.base_page = page
@@ -66,14 +64,13 @@ class BufferPool:
         return memory_page
 
     def request_page(self, position=None):
-        """Returns a page, loading from disk if necessary."""
         if position is None:
             position = self.page_request_count
             self.page_request_count += 1
 
         # evict pages if needed before adding
         while not self.has_capacity():
-            print("⚠ Buffer is full! Evicting a page before requesting a new one...")
+            print("Buffer is full! Evicting a page before requesting a new one...")
             self.evict_page()
 
         # check if page already in mem
@@ -104,7 +101,7 @@ class BufferPool:
                 f.write(memory_page.base_page.data)
 
             memory_page.is_dirty = False  # mark clean after w
-            print(f"✅ Page {memory_page.position} has successfully been written to disk!")
+            print(f"Page {memory_page.position} has successfully been written to disk!")
 
         except Exception as e:
             print(f"Failed writing page {memory_page.position}: {e}")
