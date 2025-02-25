@@ -10,24 +10,24 @@ class Database():
         self.start_path = None
 
     # Required for milestone2
-    def open(self, path):
+    def open(self, path = None):
         # TODO: Initialize a Bufferpool object
-        # self.start_path = path
-        #
-        # if os.path.exists(path):
-        #     with open(path + "/table_names", "rb") as file:
-        #         self.tables = pickle.load(file)
-        # else:
-        #     os.makedirs(path, exist_ok=True)
-        #     os.makedirs(path + "/Tables", exist_ok=True)
-        pass
+        if path:
+            self.start_path = path
+
+            if os.path.exists(path):
+                with open(path + "/table_names", "rb") as file:
+                    self.tables = pickle.load(file)
+            else:
+                os.makedirs(path, exist_ok=True)
+                os.makedirs(path + "/Tables", exist_ok=True)
 
     def close(self):
-        # # TODO: Run on close for bufferpool
-        # # Write the hash into a pickle file for later
-        # with open(self.start_path + "/table_names", 'wb') as file:
-        #     pickle.dump(self.tables, file)
-        pass
+        # TODO: Run on close for bufferpool
+        # Write the hash into a pickle file for later
+        if self.start_path:
+            with open(self.start_path + "/table_names", 'wb') as file:
+                pickle.dump(self.tables, file)
 
     """
     # Creates a new table
