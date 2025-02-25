@@ -64,7 +64,12 @@ class BufferPool:
             pass
     
     def has_capacity(self):
-        return len(self.frames) <= self.capacity # Diego: Maybe it's faster to just keep a count of how many frames are active?
+        sum = 0
+        for frames in self.frames.values():
+            for frame in frames:
+                if frame:
+                    sum += 1
+        return sum < self.capacity # Diego: Maybe it's faster to just keep a count of how many frames are active?
     
     def read_frame(self, table_name: str, page_range_index: int, num_columns: int):
         # TODO Look into possible issues with this way of reading
@@ -101,7 +106,7 @@ class BufferPool:
     
     def get_least_needed_frame(self) -> Optional[Frame]:
         all_frames: list[Frame] = []
-        for key in self.frames.keys:
+        for key in self.frames.keys():
             all_frames.extend(self.frames[key])
         sorted_frames = sorted(all_frames, key = Frame.request_count) # Frames sorted from least requested to most requested
         stop_index = 0
