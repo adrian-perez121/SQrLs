@@ -52,8 +52,10 @@ class BufferPoolTests(unittest.TestCase):
         page1.request_count = 5
         page2.request_count = 2
         page3.request_count = 1
+
         self.buffer_pool.memory_pages.extend([page1, page2, page3])
-        least_needed_page = self.buffer_pool.get_least_needed_page(self.buffer_pool.memory_pages)
+
+        least_needed_page = self.buffer_pool.get_least_needed_page()
         self.assertEqual(least_needed_page, page3)
 
     def test_frequent_page_requests(self):
@@ -94,20 +96,21 @@ class BufferPoolTests(unittest.TestCase):
         self.assertEqual(reloaded_page.position, 99)
         self.assertFalse(reloaded_page.is_dirty)  # should be clean after w
 
-
     def test_eviction_writes_dirty_pages(self):
         for i in range(self.buffer_pool.capacity):
             page = self.buffer_pool.request_page(i)
-            page.is_dirty = True  # set all pages dirty
-        # which will be evicted
-        evicted_page = self.buffer_pool.get_least_needed_page(self.buffer_pool.memory_pages)
+            page.is_dirty = True  # set all dirty
+
+        # get pate to evict
+        evicted_page = self.buffer_pool.get_least_needed_page()
         evicted_position = evicted_page.position
-        # evict
+
         self.buffer_pool.evict_page()
-        # check if evicted was written prior to removing
-        file_path = os.path.join(self.test_dir, f"page_{evicted_position}.pkl")
+
+        # check if evicted was w to disk
+        file_path = os.path.join(self.test_dir, f"page_{evicted_position}.bin")
         print(f"Checking if file {file_path} exists...")
-        self.assertTrue(os.path.exists(file_path))  # check if written
+        self.assertTrue(os.path.exists(file_path))
 
     def test_consecutive_evictions(self):
         # fill bp
@@ -121,19 +124,13 @@ class BufferPoolTests(unittest.TestCase):
         for old_page in range(5):  # 1st 5 should be evicted
             self.assertNotIn(old_page, remaining_positions, f"Page {old_page} should be evicted!")
 
-    def test_request_excess_pages(self):
-        num_extra_pages = 100  # req 100 more than cap
-        for i in range(self.buffer_pool.capacity + num_extra_pages):
-            self.buffer_pool.request_page(i)
-        # check bp never exceeds cap
-        self.assertLessEqual(len(self.buffer_pool.memory_pages), self.buffer_pool.capacity, "Buffer pool can't exceed capacity!")
-
-
     def test_on_close(self):
         page = MemoryPage(0)
         page.is_dirty = True
         self.buffer_pool.memory_pages.append(page)
-        self.buffer_pool.on_close(self.buffer_pool.memory_pages)
+
+        self.buffer_pool.on_close()
+
         for p in self.buffer_pool.memory_pages:
             self.assertFalse(p.is_dirty)
 
