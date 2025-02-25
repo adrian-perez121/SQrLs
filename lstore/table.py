@@ -17,15 +17,21 @@ class Table:
     :param num_columns: int     #Number of Columns: all columns are integer
     :param key: int             #Index of table key in columns
     """
-    def __init__(self, name, num_columns, key):
-        self.name = name
+    def __init__(self, name, num_columns, key, bufferpool):
+        self.name: str = name
         self.key = key
         self.num_columns = num_columns
-        self.page_ranges = [PageRange(num_columns)]
+        self.page_ranges = [PageRange(num_columns)] # Diego: I think with my bufferpool implementation we might be able to remove this
         self.page_ranges_index = 0
         self.page_directory = {}
         self.index = Index(self)
+<<<<<<< Updated upstream
         self.rid = Atomic(1)
+=======
+        self.rid = 1
+        
+        self.bufferpool = bufferpool
+>>>>>>> Stashed changes
         pass
 
     def new_rid(self):
@@ -39,8 +45,8 @@ class Table:
       # Check if the last added page range has room for more baserecords
       # If not add a new one and move the index up
       if not self.page_ranges[-1].has_base_page_capacity():
-        self.page_ranges.append(PageRange(self.num_columns))
-        self.page_ranges_index += 1
+        self.page_ranges.append(PageRange(self.num_columns)) # BufferPool will manage this on request of a frame with the newly updated index
+        self.page_ranges_index += 1 # Still necessary
 
     def __merge(self):
         print("merge is happening")

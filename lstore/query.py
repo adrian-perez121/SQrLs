@@ -1,5 +1,7 @@
 import time
 
+from lstore.bufferpool import BufferPool, Frame, MemoryPageRange
+from lstore.page_range import PageRange
 from lstore.table import Table
 from lstore.record import Record
 import lstore.config as config
@@ -14,8 +16,9 @@ class Query:
     Queries that succeed should return the result or True
     Any query that crashes (due to exceptions) should return False
     """
-    def __init__(self, table):
+    def __init__(self, table: Table):
         self.table: Table = table
+        self.bufferpool: BufferPool = table.bufferpool
         pass
 
     def create_metadata(self, rid, indirection = 0, schema = 0):
@@ -96,7 +99,14 @@ class Query:
           return False
 
         rid = self.table.new_rid()
-        page_range = self.table.page_ranges[self.table.page_ranges_index]  # Get a page range we can write into
+        # TODO: Request Page logic (???) maybe link page range logic to bufferpool
+        # bufferpool request range (self.table, index)
+        frame: Frame = self.bufferpool.get_frame(self.table, self.table.page_ranges_index, self.table.num_columns)
+        frame.pin += 1
+        page_range: PageRange = frame.page_range
+
+        frame.is_dirty = True
+        # TODO: Decrement Pin Count
 
         # Create an array with the metadata columns, and then add in the regular data columns
         new_record = self.create_metadata(rid)
@@ -109,6 +119,9 @@ class Query:
         self.table.index.add(new_record)
       # - add the record in the index
 
+        frame.pin -= 1
+
+        # TODO: Question, why?
         self.table.add_new_page_range()
 
         return True
@@ -147,7 +160,6 @@ class Query:
     def select(self, search_key, search_key_index, projected_columns_index):
       # Select wants the latest version so this is select version 0
       return self.select_version(search_key, search_key_index, projected_columns_index, 0)
-
 
     def __select_base_records(self, search_key, search_key_index, projected_columns_index):
       records = []
