@@ -26,7 +26,8 @@ class Database():
     def close(self):
         # TODO: Run on close for bufferpool
         if hasattr(self, "bufferpool"):
-            self.bufferpool.on_close(self.bufferpool.memory_pages)  # flush
+            self.bufferpool.on_close()  # flush
+
             print("All pages flushed to disk.")
         print("Database closed successfully.")
 
