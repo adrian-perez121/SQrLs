@@ -59,7 +59,7 @@ class MyTestCase(unittest.TestCase):
   def test_load_and_dump_files(self):
     test_conceptual_page = ConceptualPage(2)
 
-    for i in range(0,4096, 128): # Step is to make the test faster
+    for i in range(0,4096, 5): # Step is to make the test faster
 
       # six columns long because meta data columns
       test_conceptual_page.write_record([i, i, i, i, i, i])
