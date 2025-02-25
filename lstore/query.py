@@ -102,11 +102,10 @@ class Query:
         # TODO: Request Page logic (???) maybe link page range logic to bufferpool
         # bufferpool request range (self.table, index)
         frame: Frame = self.bufferpool.get_frame(self.table, self.table.page_ranges_index, self.table.num_columns)
-        frame.pin += 1
+        frame.pin += 1 # Using the frame, don't evict please
         page_range: PageRange = frame.page_range
 
         frame.is_dirty = True
-        # TODO: Decrement Pin Count
 
         # Create an array with the metadata columns, and then add in the regular data columns
         new_record = self.create_metadata(rid)
@@ -114,15 +113,13 @@ class Query:
           new_record.append(data)
         # - write this record into the table
         index, slot = page_range.write_base_record(new_record)
+        frame.pin -= 1 # No longer using the frame
         # - add the RID and location into the page directory
         self.table.page_directory[rid] = (self.table.page_ranges_index, index, slot)
         self.table.index.add(new_record)
       # - add the record in the index
 
-        frame.pin -= 1
-
-        # TODO: Question, why?
-        self.table.add_new_page_range()
+        self.table.add_new_page_range() # Function adds new page range IF NEEDED
 
         return True
       
@@ -171,7 +168,9 @@ class Query:
       for rid in rids:
         page_range_index, base_page_index, slot = self.table.page_directory[rid]
         # We know we can read from a base record because the rid in a page directory points to a page record
+        # TODO: frame.pin += 1
         record_data = self.table.page_ranges[page_range_index].read_base_record(base_page_index, slot, projected_columns_index)
+        # TODO: frame.pin -= 1
         record = self.__build_record(record_data, search_key)
         records.append(record)
 
@@ -200,7 +199,9 @@ class Query:
           page_range_index, tail_index, tail_slot = self.table.page_directory[current_rid]
           return_base_record = False
           # Get the tail record
+          # TODO: Add Pin to Frame
           tail_record = self.table.page_ranges[page_range_index].read_tail_record(tail_index, tail_slot, projected_columns_index)
+          # TODO: Decrement Pin here?
           # if the indirection for the tail record is the base record rid we hit the end, so just return the base record
           # else combine the data from the latest tail with columns that haven't been updated in base.
           while version_num > relative_version:
@@ -209,8 +210,10 @@ class Query:
               break
             current_rid = tail_record[config.INDIRECTION_COLUMN]
             page_range_index, tail_index, tail_slot = self.table.page_directory[current_rid]
+            # TODO: Add Pin to Frame
             tail_record = self.table.page_ranges[page_range_index].read_tail_record(tail_index, tail_slot,
                                                                                     projected_columns_index)
+            # TODO: Decrement Pin here?
             version_num -= 1
 
           # relative_version < version_num means that we ran out of versions to traverse

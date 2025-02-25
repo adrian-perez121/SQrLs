@@ -14,10 +14,7 @@ class Frame:
         self.last_accessed = time.time()
         self.table_name: str = table_name
         self.position: int = position
-<<<<<<< Updated upstream
-        self.base_page: ConceptualPage = None
-        self.tail_page: ConceptualPage = None
-=======
+            
         self.pin = 0
         
         self.page_range: PageRange = page_range
@@ -30,9 +27,8 @@ def frame_from_dict(dict, table_name: str, position: int, num_columns: int, from
         # TODO
         # New Frame with correct position, table_name, and usually from disk should be true if using this function
         # Use num of columns if necessary, but you could probably store it in the dict somewhere to access on read
+        # Remember to mark not dirty by passing from_disk
         pass
-
->>>>>>> Stashed changes
 
 class BufferPool:
     
@@ -42,30 +38,14 @@ class BufferPool:
     
     def __init__(self, path):
         self.frame_request_count = 0 # For Most Used
-        self.frames: dict[str, list[Frame]] = {}
+        self.frames: dict[str, list[Frame]] = {} # When Frames are evicted, the frame in the list is replaced with None
         self.capacity = 16 # M3: Do we need more frames?
         self.path = path
         self.next_file_name = 0
         self.files = {file: os.path.join(path, file) for file in os.listdir(path)}
         pass
     
-<<<<<<< Updated upstream
-    def request_record():
-        pass
-    
-    def request_page(self):
-        self.page_request_count += 1
-        page: MemoryPage = None
-        
-        page.request_count += 1
-        pass
-    
-    def has_capacity():
-        pass
-=======
     def get_frame(self, table_name: str, page_range_index: int, num_columns: int):
-        # TODO: HAS CAPACITY if not evict
-        # TODO: Diego: Very incomplete, list needs to expand to right index and table key needs to be put in at some point possibly here along with an empty expandable list
         self.frames.setdefault(table_name, [])
         if table_name in self.frames:
             frames: list[Frame] = self.frames[table_name]
@@ -73,17 +53,18 @@ class BufferPool:
             frames.extend([None] * append_count)
             frame: Frame = frames[page_range_index]
             if not frame:
+                if not self.has_capacity() and not self.evict_frame():
+                    raise Exception("Couldn't evict any frames") # Capacity reached, couldn't evict a frame to store new one
                 frame = self.read_frame(table_name, page_range_index, num_columns)
                 frames[page_range_index] = frame
             frame.request_count += 1
             return frame
         else:
-            # 
-            # TODO OOPS
+            # TODO Can't happen, exception? ignore idk
             pass
     
     def has_capacity(self):
-        return len(self.memory_pages) <= self.capacity
+        return len(self.frames) <= self.capacity # Diego: Maybe it's faster to just keep a count of how many frames are active?
     
     def read_frame(self, table_name: str, page_range_index: int, num_columns: int):
         # TODO Look into possible issues with this way of reading
@@ -114,7 +95,6 @@ class BufferPool:
         else:
             print("Somehow the write path didn't exist after making it.")
             pass
->>>>>>> Stashed changes
     
     def write_page():
         pass
@@ -136,21 +116,27 @@ class BufferPool:
         return sorted_frames[0] if sorted_frames else None
             
     # Evict Frame aka a Page Range with the Frame Data
-    def evict_frame(self):
+    def evict_frame(self) -> bool:
+        # TODO: Try to evict a different frame
         # If Frame Dirty, write to Disk
-        if self.frames and not self.has_capacity():
-            frame = self.get_least_needed_frame()
-            if frame.is_dirty:
-                
-                if frame.pins: # M3: TODO might not work if pins is atomic
-                    # M3: Try to evict something else
-                    # TODO
-                    pass
-                else:
-                    if frame.table_name in self.frames:
-                        self.write_frame(frame)
-                        self.frames[frame.table_name][frame.position] = None
-        pass
+        frame = self.get_least_needed_frame()
+        if frame:
+            if frame.pins: # M3: TODO might not work if pins is atomic
+                # You can either wait to evict the page (might be problematic)
+                # or try evicting other ones by modifying get_least_needed_frame
+                # to return frames in order of most needed to least needed
+                # TODO
+                return False
+            else:
+                if frame.is_dirty:
+                    self.write_frame(frame)
+                self.frames[frame.table_name][frame.position] = None
+                return True
+        else:
+            # TODO Logic if get least needed frame is falsy
+            return True
+        
+        
     
     def on_close(self):
         for frame in self.frames:

@@ -5,19 +5,12 @@ import lstore.config
 class Database():
 
     def __init__(self):
-<<<<<<< Updated upstream
-        self.tables: dict[str, Table] = {}
-=======
         self.tables = {}
         self.start_path = None
         self.bufferpool = None
->>>>>>> Stashed changes
 
     def open(self, path):
         # TODO: Initialize a Bufferpool object
-<<<<<<< Updated upstream
-        pass
-=======
         self.start_path = path
         self.bufferpool = BufferPool(self.start_path)
         # TODO: get all frames that were previously active on the last run
@@ -28,7 +21,6 @@ class Database():
         else:
             os.makedirs(path, exist_ok=True)
             os.makedirs(path + "/Tables", exist_ok=True)
->>>>>>> Stashed changes
 
     def close(self):
         # TODO: Run on close for bufferpool
