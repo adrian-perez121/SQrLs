@@ -122,7 +122,7 @@ class ConceptualPage:
       data[str(i)] = {}
 
       for j, physical_page in enumerate(column):
-        data[str(i)][str(j)] = physical_page.to_json_string()
+        data[str(i)][str(j)] = physical_page.to_dict()
     return data
 
   def dump_file(self, name):
@@ -145,8 +145,10 @@ class ConceptualPage:
     pages = []
     for column in range(new_conceptual_page.total_columns):
       pages.append([])
-      for page_num in range(len(data[str(column)])):
-        pages[column].append(Page.from_json_string(data[str(column)][str(page_num)]))
+      for page in data[str(column)]:
+        json_str = json.dumps(data[str(column)][str(page)])
+        pages[column].append(Page.from_json_string(json_str))
+
 
     new_conceptual_page.pages = pages
     return new_conceptual_page
