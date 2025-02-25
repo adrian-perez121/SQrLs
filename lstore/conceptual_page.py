@@ -107,25 +107,27 @@ class ConceptualPage:
     physical_page_slot = slot % 512
     self.pages[column][physical_page_level].write(new_indirection, physical_page_slot)
 
-  def dump_file(self, name):
-    # File will be overwritten if it exists
 
+  def to_dict(self):
+    # File will be overwritten if it exists
     data = {}
 
     # Some meta data stuff {
     data["regular_columns"] = self.regular_columns
     data["metadata_columns"] = self.metadata_columns
     data["num_records"] = self.num_records
-    # # }
+    # }
 
     for i, column in enumerate(self.pages):
       data[str(i)] = {}
 
       for j, physical_page in enumerate(column):
         data[str(i)][str(j)] = physical_page.to_json_string()
+    return data
 
+  def dump_file(self, name):
     with open(f"{name}.json", "w") as file:
-      json.dump(data, file, indent=4)
+      json.dump(self.to_dict(), file, indent=4)
 
 
   @classmethod

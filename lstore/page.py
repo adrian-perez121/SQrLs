@@ -36,11 +36,14 @@ class Page:
 
     return int.from_bytes(self.data[slot * 8: (slot + 1) * 8], byteorder='big')
 
-  def to_json_string(self):
+  def to_dict(self):
     data = {}
     data["num_records"] = self.num_records
     data["byte_array"] = base64.b64encode(self.data).decode('utf-8')
-    return json.dumps(data)
+    return data
+
+  def to_json_string(self):
+    return json.dumps(self.to_dict())
 
   @classmethod
   def from_json_string(cls, json_data):
