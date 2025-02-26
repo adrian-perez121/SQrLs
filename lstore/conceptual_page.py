@@ -125,6 +125,22 @@ class ConceptualPage:
         data[str(i)][str(j)] = physical_page.to_dict()
     return data
 
+  @classmethod
+  def from_dict(cls, data):
+    new_conceptual_page = cls(data["regular_columns"])
+    new_conceptual_page.metadata_columns = data["metadata_columns"]
+    new_conceptual_page.num_records = data["num_records"]
+
+    pages = []
+    for column in range(new_conceptual_page.total_columns):
+      pages.append([])
+      for page in data[str(column)]:
+        pages[column].append(Page.from_dict(data[str(column)][str(page)]))
+
+
+    new_conceptual_page.pages = pages
+    return new_conceptual_page
+
   def dump_file(self, name):
     with open(f"{name}.json", "w") as file:
       json.dump(self.to_dict(), file, indent=4)

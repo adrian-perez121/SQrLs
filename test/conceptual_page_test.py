@@ -77,6 +77,24 @@ class MyTestCase(unittest.TestCase):
 
     os.remove("testpage.json") # clean up
 
+  def test_to_and_from_dict(self):
+    test_conceptual_page = ConceptualPage(2)
+
+    for i in range(0,4096, 10):
+
+      # six columns long because meta data columns
+      test_conceptual_page.write_record([i, i, i, i, i, i])
+      data = test_conceptual_page.to_dict()
+      new_page = ConceptualPage.from_dict(data)
+
+      # Make sure the physical pages match
+      for i, column in enumerate(test_conceptual_page.pages):
+        for j, physical_page in enumerate(column):
+          self.assertEqual(physical_page.num_records, new_page.pages[i][j].num_records)
+          self.assertEqual(physical_page.data, new_page.pages[i][j].data)
+
+        self.assertEqual(test_conceptual_page.num_records, new_page.num_records)
+
 
 
 

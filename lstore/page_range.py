@@ -109,6 +109,17 @@ class PageRange:
     data["tail_pages_slot"] = self.tail_pages_slot
     return data
 
+  @classmethod
+  def from_dict(cls, data):
+    new_page_range = cls(data["regular_columns"])
+    new_page_range.meta_data_columns = data["meta_data_columns"]
+    new_page_range.base_pages = [ConceptualPage.from_dict(page) for page in data["base_pages"]]
+    new_page_range.base_pages_index = data["base_pages_index"]
+    new_page_range.base_pages_slot = data["base_pages_slot"]
+    new_page_range.tail_pages = [ConceptualPage.from_dict(page) for page in data["tail_pages"]]
+    new_page_range.tail_pages_index = data["tail_pages_index"]
+    new_page_range.tail_pages_slot = data["tail_pages_slot"]
+    return new_page_range
 
 
 

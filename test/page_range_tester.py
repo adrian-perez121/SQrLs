@@ -48,6 +48,25 @@ class MyTestCase(unittest.TestCase):
         test_page_range.update_tail_record_column(b_index, b_slot, config.INDIRECTION_COLUMN, i + 1)
         self.assertEqual(i + 1, test_page_range.read_tail_record(t_index, t_slot, [0])[config.INDIRECTION_COLUMN])
 
+    def test_to_and_from_dict(self):
+        test_page_range = PageRange(1)
+        for i in range(3000):
+            b_index, b_slot = test_page_range.write_base_record([i, i, i, i, i])
+            t_index, t_slot = test_page_range.write_tail_record([i, i, i, i, i])
+
+            data = test_page_range.to_dict()
+            new_page_range = PageRange.from_dict(data)
+
+            b_record = test_page_range.read_base_record(b_index, b_slot, [1] * test_page_range.regular_columns)
+            new_b_record = new_page_range.read_base_record(b_index, b_slot, [1] * test_page_range.regular_columns)
+            self.assertEqual(b_record, new_b_record)
+
+            t_record = test_page_range.read_tail_record(t_index, t_slot, [1] * test_page_range.regular_columns)
+            new_t_record = new_page_range.read_tail_record(t_index, t_slot, [1] * test_page_range.regular_columns)
+            self.assertEqual(t_record, new_t_record)
+
+            # Since they are the same they should make the same dict
+            self.assertEqual(test_page_range.to_dict(), new_page_range.to_dict())
 
 if __name__ == '__main__':
     unittest.main()
