@@ -69,15 +69,16 @@ class BufferPool:
             frame: Frame = frames[page_range_index]
             if not frame:
                 self.read_frame(table_name, page_range_index, num_columns)
-                frames[page_range_index] = frame
+                frame = frames[page_range_index]
             frame.request_count += 1
             return frame
         else:
-            #
             # TODO OOPS
             return None
 
     def has_capacity(self):
+        sum = 0
+        
         return len(self.memory_pages) <= self.capacity
 
     def read_frame(self, table_name: str, page_range_index: int, num_columns: int):
