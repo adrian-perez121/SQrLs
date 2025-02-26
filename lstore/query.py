@@ -112,6 +112,7 @@ class Query:
         rid = self.table.new_rid()
         # TODO: Request Page logic (???) maybe link page range logic to bufferpool
         # bufferpool request range (self.table, index)
+        print(f"Insert on Page Range {self.table.name}, {self.table.page_ranges_index}, {self.table.num_columns}")
         frame: Frame = self.bufferpool.get_frame(self.table.name, self.table.page_ranges_index, self.table.num_columns)
         frame.pin += 1
         page_range: PageRange = frame.page_range

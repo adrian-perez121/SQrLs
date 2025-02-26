@@ -14,9 +14,7 @@ class Frame:
         page_range: PageRange,
         from_disk: bool = False,
     ):
-        self.is_dirty: bool = (
-            not from_disk
-        )  # Pages not read from disk should be dirty so that they are written
+        self.is_dirty: bool = not from_disk # Pages not read from disk should be dirty so that they are written
         self.request_count: int = 0
         self.last_accessed = time.time()
         self.table_name: str = table_name
@@ -70,6 +68,8 @@ class BufferPool:
             if not frame:
                 self.read_frame(table_name, page_range_index, num_columns)
                 frame = frames[page_range_index]
+                print(f"Read Frame {frame}")
+                
             frame.request_count += 1
             return frame
         else:
@@ -78,8 +78,12 @@ class BufferPool:
 
     def has_capacity(self):
         sum = 0
+        for table_frames in self.frames.values():
+            for frame in table_frames:
+                if frame:
+                    sum += 1
         
-        return len(self.memory_pages) <= self.capacity
+        return sum <= self.capacity
 
     def read_frame(self, table_name: str, page_range_index: int, num_columns: int):
         # TODO Look into possible issues with this way of reading
@@ -114,18 +118,12 @@ class BufferPool:
                 pass
             try:
                 with open(frame_path, "w", encoding="utf-8") as file:
-                    json.dump(frame.to_dict(), file)
+                    json.dump(frame.page_range.to_dict(), file)
             except Exception as e:
                 print(f"Exception raised while writing frame to disk: {e}")
         else:
             print("Somehow the write path didn't exist after making it.")
             pass
-
-    def is_pinned(self):
-        # determine whether or not the page is pinned (currently being used)
-        # return bool
-        return self.memory_pages.pins == 1  # currently in use
-        # pass
 
     def get_least_needed_frame(self) -> Optional[Frame]:
         all_frames: list[Frame] = []
@@ -153,7 +151,7 @@ class BufferPool:
         if self.frames and not self.has_capacity():
             frame = self.get_least_needed_frame()
             if frame.is_dirty:
-                if frame.pins:  # M3: TODO might not work if pins is atomic
+                if frame.pin:  # M3: TODO might not work if pins is atomic
                     # M3: Try to evict something else
                     # TODO
                     pass
@@ -164,6 +162,8 @@ class BufferPool:
         pass
 
     def on_close(self):
-        for frame in self.frames.values():
-            if frame.is_dirty:
-                self.write_frame(frame)
+        for table_frames in self.frames.values():
+            for frame in table_frames:
+                if frame.is_dirty:
+                    self.write_frame(frame)
+            
