@@ -1,6 +1,6 @@
 import time
 
-from lstore.bufferpool import BufferPool, Frame, MemoryPageRange
+from lstore.bufferpool import BufferPool, Frame
 from lstore.page_range import PageRange
 from lstore.table import Table
 from lstore.record import Record
@@ -50,7 +50,10 @@ class Query:
 
         for rid in rids:
           page_range_index, base_page_index, base_slot = self.table.page_directory[rid]
-          page_range = self.table.page_ranges[page_range_index]
+          
+          with self.bufferpool.get_frame(self.table.name, page_range_index, self.table.num_columns) as frame:
+            page_range: PageRange = frame.page_range
+          
           base_record = page_range.read_base_record(base_page_index, base_slot, [1] * self.table.num_columns)
 
           if page_range_index is None:
@@ -104,7 +107,7 @@ class Query:
         rid = self.table.new_rid()
         # TODO: Request Page logic (???) maybe link page range logic to bufferpool
         # bufferpool request range (self.table, index)
-        frame: Frame = self.bufferpool.get_frame(self.table, self.table.page_ranges_index, self.table.num_columns)
+        frame: Frame = self.bufferpool.get_frame(self.table.name, self.table.page_ranges_index, self.table.num_columns)
         frame.pin += 1
         page_range: PageRange = frame.page_range
 

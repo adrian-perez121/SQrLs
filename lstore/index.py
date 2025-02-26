@@ -19,7 +19,7 @@ A data strucutre holding indices for various columns of a table. Key column shou
 class Index:
     def __init__(self, table):
         # One index for each table. All our empty initially.
-        self.indices = [None] * table.num_columns
+        self.indices: list = [None] * table.num_columns
         self.key = table.key
         self.indices[self.key] = OOBTree()
 

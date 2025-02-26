@@ -1,5 +1,5 @@
 from lstore.page import Page  # Assuming your Page class is defined in page.py
-import lstore.config as config
+import json
 
 class ConceptualPage:
   def __init__(self, num_columns):
@@ -104,3 +104,63 @@ class ConceptualPage:
     self.pages[column][physical_page_level].write(new_indirection, physical_page_slot)
 
 
+  def to_dict(self):
+    # File will be overwritten if it exists
+    data = {}
+
+    # Some meta data stuff {
+    data["regular_columns"] = self.regular_columns
+    data["metadata_columns"] = self.metadata_columns
+    data["num_records"] = self.num_records
+    # }
+
+    for i, column in enumerate(self.pages):
+      data[str(i)] = {}
+
+      for j, physical_page in enumerate(column):
+        data[str(i)][str(j)] = physical_page.to_dict()
+    return data
+
+  @classmethod
+  def from_dict(cls, data):
+    new_conceptual_page = cls(data["regular_columns"])
+    new_conceptual_page.metadata_columns = data["metadata_columns"]
+    new_conceptual_page.num_records = data["num_records"]
+
+    pages = []
+    for column in range(new_conceptual_page.total_columns):
+      pages.append([])
+      for page in data[str(column)]:
+        pages[column].append(Page.from_dict(data[str(column)][str(page)]))
+
+
+    new_conceptual_page.pages = pages
+    return new_conceptual_page
+
+  def dump_file(self, name):
+    with open(f"{name}.json", "w") as file:
+      json.dump(self.to_dict(), file, indent=4)
+
+
+  @classmethod
+  def load_file(cls, json_file_name):
+    data = {}
+    with open(f"{json_file_name}.json") as file:
+      data = json.load(file)
+
+
+    regular_columns = data["regular_columns"]
+    new_conceptual_page = cls(regular_columns)
+    new_conceptual_page.metadata_columns = data["metadata_columns"]
+    new_conceptual_page.num_records = data["num_records"]
+
+    pages = []
+    for column in range(new_conceptual_page.total_columns):
+      pages.append([])
+      for page in data[str(column)]:
+        json_str = json.dumps(data[str(column)][str(page)])
+        pages[column].append(Page.from_json_string(json_str))
+
+
+    new_conceptual_page.pages = pages
+    return new_conceptual_page

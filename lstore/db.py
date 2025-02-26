@@ -1,30 +1,19 @@
 from lstore.bufferpool import BufferPool
 from lstore.table import Table
-import lstore.config
 
 class Database():
 
     def __init__(self):
         self.tables = {}
         self.start_path = None
-        self.bufferpool = None
+        self.bufferpool: BufferPool = None
 
     def open(self, path):
-        # TODO: Initialize a Bufferpool object
         self.start_path = path
         self.bufferpool = BufferPool(self.start_path)
-        # TODO: get all frames that were previously active on the last run
-
-        if os.path.exists(path):
-            with open(path + "/table_names", "rb") as file:
-                self.tables = pickle.load(file)
-        else:
-            os.makedirs(path, exist_ok=True)
-            os.makedirs(path + "/Tables", exist_ok=True)
 
     def close(self):
-        # TODO: Run on close for bufferpool
-        pass
+        self.bufferpool.on_close()
 
     """
     # Creates a new table

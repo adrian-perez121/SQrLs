@@ -4,7 +4,6 @@ import time
 import json
 from typing import Optional
 
-from lstore.conceptual_page import ConceptualPage
 from lstore.page_range import PageRange
 
 class Frame:
@@ -18,22 +17,15 @@ class Frame:
         
         self.page_range: PageRange = page_range
         
-    def to_dict(self):
-        # TODO
-        pass
+    def __enter__(self):
+        self.pin += 1
+        return self
     
-def frame_from_dict(dict, table_name: str, position: int, num_columns: int, from_disk: bool = True) -> Frame:
-        # TODO
-        # New Frame with correct position, table_name, and usually from disk should be true if using this function
-        # Use num of columns if necessary, but you could probably store it in the dict somewhere to access on read
-        pass
+    def __exit__(self, exception_type, exception_value, exception_traceback):
+        self.pin -= 1
 
 
 class BufferPool:
-    
-    # Memory Page
-        # self.request_count
-        # self.last_access
     
     def __init__(self, path):
         self.frame_request_count = 0 # For Most Used
@@ -41,7 +33,19 @@ class BufferPool:
         self.capacity = 16 # M3: Do we need more frames?
         self.path = path
         self.next_file_name = 0
+        
         self.files = {file: os.path.join(path, file) for file in os.listdir(path)}
+        
+        table_path = os.path.join(self.path, "tables")
+        self.table_range_start_indices = {}
+        for table_name in os.listdir(table_path):
+            table_dir = os.path.join(table_path, table_name)
+            if os.path.isdir(table_dir):
+                indices = [int(f.split(".")[0]) for f in os.listdir(table_dir) if f.endswith(".json")]
+                index = max(indices, default=-1)
+                if index > -1:
+                    self.table_range_start_indices[table_name] = index
+        
         pass
     
     def get_frame(self, table_name: str, page_range_index: int, num_columns: int):
@@ -61,7 +65,7 @@ class BufferPool:
         else:
             # 
             # TODO OOPS
-            pass
+            return None
     
     def has_capacity(self):
         return len(self.memory_pages) <= self.capacity
@@ -72,7 +76,7 @@ class BufferPool:
         if os.path.exists(read_path):
             try:
                 with open(read_path, "rb") as file:
-                    self.frames[table_name][page_range_index] = frame_from_dict(json.load(file), position = page_range_index, table_name = table_name, num_columns = num_columns)
+                    self.frames[table_name][page_range_index] = Frame(table_name, page_range_index, PageRange.from_dict(json.load(file)), num_columns, from_disk = True)
             except Exception as e:
                 print(f"Exception raised while reading frame from disk: {e}")
         else:
@@ -136,7 +140,7 @@ class BufferPool:
         pass
     
     def on_close(self):
-        for frame in self.frames:
+        for frame in self.frames.values():
             if frame.is_dirty:
                 self.write_frame(frame)
             
