@@ -35,6 +35,7 @@ class Table:
       tmp = self.rid
       self.rid += 1
       return tmp
+      
 
     def add_new_page_range(self):
       if self.bufferpool.get_frame(self.name, self.page_ranges_index, self.num_columns).page_range.has_base_page_capacity():
