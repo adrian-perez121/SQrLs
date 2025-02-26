@@ -43,17 +43,18 @@ class BufferPool:
 
         table_path = os.path.join(self.path, "tables")
         self.table_range_start_indices = {}
-        for table_name in os.listdir(table_path):
-            table_dir = os.path.join(table_path, table_name)
-            if os.path.isdir(table_dir):
-                indices = [
-                    int(f.split(".")[0])
-                    for f in os.listdir(table_dir)
-                    if f.endswith(".json")
-                ]
-                index = max(indices, default=-1)
-                if index > -1:
-                    self.table_range_start_indices[table_name] = index
+        if os.path.exists(table_path):
+            for table_name in os.listdir(table_path):
+                table_dir = os.path.join(table_path, table_name)
+                if os.path.isdir(table_dir):
+                    indices = [
+                        int(f.split(".")[0])
+                        for f in os.listdir(table_dir)
+                        if f.endswith(".json")
+                    ]
+                    index = max(indices, default=-1)
+                    if index > -1:
+                        self.table_range_start_indices[table_name] = index
 
         pass
 
