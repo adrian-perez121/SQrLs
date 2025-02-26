@@ -24,7 +24,7 @@ class Table:
         self.page_ranges = [PageRange(num_columns)] # Diego: I think with my bufferpool implementation we might be able to remove this
         self.page_ranges_index = 0
         self.page_directory = {}
-        self.index = Index(self)
+        self.index: Index = Index(self)
         self.rid = 1
         
         self.bufferpool = bufferpool
