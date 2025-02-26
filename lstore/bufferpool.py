@@ -68,7 +68,7 @@ class BufferPool:
             frames.extend([None] * append_count)
             frame: Frame = frames[page_range_index]
             if not frame:
-                frame = self.read_frame(table_name, page_range_index, num_columns)
+                self.read_frame(table_name, page_range_index, num_columns)
                 frames[page_range_index] = frame
             frame.request_count += 1
             return frame
@@ -98,7 +98,9 @@ class BufferPool:
             except Exception as e:
                 print(f"Exception raised while reading frame from disk: {e}")
         else:
-            Frame(table_name, page_range_index, PageRange(num_columns))
+            self.frames[table_name][page_range_index] = Frame(
+                table_name, page_range_index, PageRange(num_columns)
+            )
 
     def write_frame(self, frame: Frame):
         # TODO Look into possible issues with this way of writing

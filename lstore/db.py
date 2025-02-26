@@ -4,7 +4,7 @@ from lstore.table import Table
 class Database():
 
     def __init__(self):
-        self.tables = {}
+        self.tables: dict[str, Table] = {}
         self.start_path = None
         self.bufferpool: BufferPool = None
 
@@ -28,7 +28,6 @@ class Database():
         table = Table(name, num_columns, key_index, self.bufferpool)
         self.tables[name] = table
         return table
-
 
     """
     # Deletes the specified table
