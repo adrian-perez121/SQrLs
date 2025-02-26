@@ -148,16 +148,12 @@ class BufferPool:
         )  # Least requested pages sorted from oldest access to most recent access
         return sorted_frames[0] if sorted_frames else None
     
-    def get_least_needed_frame(self) -> Optional[Frame]:
+    def get_least_needed_frames_first(self) -> list[Frame]:
         all_frames: list[Frame] = []
         for key in self.frames.keys():
             all_frames.extend(self.frames[key])
             
-        
-        sorted_frames = sorted(sorted(sorted(all_frames,
-                                                key=Frame.request_count
-                                            ),  key=Frame.last_accessed
-                                            ),  key=Frame.pin)  # Frames sorted from least requested to most requested
+        sorted_frames = sorted(all_frames, key=lambda frame: (frame.pin, frame.last_accessed, frame.request_count))
         stop_index = 0
         least_requests = 0
         for i, frame in enumerate(sorted_frames):
@@ -169,22 +165,22 @@ class BufferPool:
         sorted_frames = sorted(
             sorted_frames[0:stop_index], key=Frame.last_accessed
         )  # Least requested pages sorted from oldest access to most recent access
-        return sorted_frames[0] if sorted_frames else None
+        return sorted_frames
 
     # Evict Frame aka a Page Range with the Frame Data
     def evict_frame(self):
         # If Frame Dirty, write to Disk
         if self.frames and not self.has_capacity():
-            frame = self.get_least_needed_frame()
-            if frame.is_dirty:
-                if frame.pin:  # M3: TODO might not work if pins is atomic
-                    # M3: Try to evict something else
-                    # TODO
-                    pass
-                else:
-                    if frame.table_name in self.frames:
+            frames = self.get_least_needed_frames_first()
+            if not frames:
+                raise Exception("No frames to evict.")
+            frame = frames[0]
+            if frame.is_dirty and not frame.pin:
+                if frame.table_name in self.frames:
                         self.write_frame(frame)
                         self.frames[frame.table_name][frame.position] = None
+            else:
+                raise Exception("Failed to evict.")
 
     def on_close(self):
         for table_frames in self.frames.values():
