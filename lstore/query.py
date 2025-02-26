@@ -1,14 +1,11 @@
 import time
-from operator import truediv
 
 from lstore.bufferpool import BufferPool, Frame
 from lstore.page_range import PageRange
 from lstore.table import Table
 from lstore.record import Record
 import lstore.config as config
-from lstore.index import Index
 from datetime import datetime
-
 
 class Query:
     """
@@ -246,7 +243,7 @@ class Query:
     def update(self, primary_key, *columns):
       pk_column = self.table.key
       # You shouldn't be allowed to change the primary key
-      if columns[pk_column] != None and primary_key != columns[pk_column]:
+      if columns[pk_column] is not None and primary_key != columns[pk_column]:
         return False
 
       rids = self.table.index.locate(self.table.key, primary_key)
@@ -255,7 +252,7 @@ class Query:
       # be done after we are done updating
       old_records = self.select(primary_key, self.table.index.key, [1] * self.table.num_columns)
 
-      if rids == None:
+      if rids is None:
         return False
 
       for rid in rids:
@@ -274,13 +271,13 @@ class Query:
 
           # Set ones for the changed things
           for i, data in enumerate(columns):
-            if data != None:
+            if data is not None:
               updated_schema_encoding[i] = 1
           schema_encoding_num = self.__bit_array_to_number(updated_schema_encoding)
 
           record_data = self.create_metadata(tail_rid, base_record[config.RID_COLUMN], schema_encoding_num)
           for data in columns:
-            if data != None:
+            if data is not None:
               record_data.append(data)
             else:
               record_data.append(0)
@@ -300,13 +297,13 @@ class Query:
           new_tail_rid = self.table.new_rid()
 
           for i, data in enumerate(columns):
-            if data != None: # Combining schema encodings
+            if data is not None: # Combining schema encodings
               base_record_updated_schema_encoding[i] = 1
           tail_schema_encoding_num = self.__bit_array_to_number(base_record_updated_schema_encoding)
 
           new_tail_record_data = self.create_metadata(new_tail_rid, latest_tail_rid, tail_schema_encoding_num)
           for i, data in enumerate(columns):
-            if data != None:
+            if data is not None:
               new_tail_record_data.append(data)
             elif latest_tail_record[i + 4]: # If there's data actually there
               new_tail_record_data.append(latest_tail_record[i + 4]) # Offset for metadata columns
