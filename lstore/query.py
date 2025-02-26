@@ -1,4 +1,5 @@
 import time
+from operator import truediv
 
 from lstore.bufferpool import BufferPool, Frame, MemoryPageRange
 from lstore.page_range import PageRange
@@ -50,29 +51,34 @@ class Query:
 
         for rid in rids:
           page_range_index, base_page_index, base_slot = self.table.page_directory[rid]
-          page_range = self.table.page_ranges[page_range_index]
+
+          frame: Frame = self.bufferpool.get_frame(self.table.name, page_range_index,
+                                                   self.table.num_columns)
+          frame.pin += 1
+          page_range: PageRange = frame.page_range
+
           base_record = page_range.read_base_record(base_page_index, base_slot, [1] * self.table.num_columns)
 
-          if page_range_index is None:
-            return False
 
           base_rid = rid
           page_range.update_base_record_column(base_page_index, base_slot, config.RID_COLUMN, 0)
 
           current_rid = base_record[config.INDIRECTION_COLUMN]
           while current_rid and current_rid != base_rid:
+            # We know we don't have to get a new frame because any update to a base record in a page range goes to a
+            # tail record in the same page range
             page_range_index, tail_index, tail_slot = self.table.page_directory[current_rid]
-            if page_range_index is None:
-              break
-            tail_record = self.table.page_ranges[page_range_index].read_tail_record(tail_index, tail_slot,
+
+            tail_record = page_range.read_tail_record(tail_index, tail_slot,
                                                                                    [0] * self.table.num_columns)
 
-            self.table.page_ranges[page_range_index].update_tail_record_column(tail_index, tail_slot, config.RID_COLUMN,
+            page_range_index.update_tail_record_column(tail_index, tail_slot, config.RID_COLUMN,
                                                                               0)
             current_rid = tail_record[config.INDIRECTION_COLUMN]
 
           self.table.index.delete(base_record)
-          # self.table.index.remove(primary_key, rid)
+          frame.is_dirty = True
+          frame.pin -= 1
           self.table.page_directory[rid] = None
 
         return True
@@ -101,10 +107,15 @@ class Query:
         if len(columns) != self.table.num_columns:
           return False
 
+        pk_column = self.table.index.key
+
+        if columns[pk_column] in self.table.index.indices[pk_column]:
+          return False
+
         rid = self.table.new_rid()
         # TODO: Request Page logic (???) maybe link page range logic to bufferpool
         # bufferpool request range (self.table, index)
-        frame: Frame = self.bufferpool.get_frame(self.table, self.table.page_ranges_index, self.table.num_columns)
+        frame: Frame = self.bufferpool.get_frame(self.table.name, self.table.page_ranges_index, self.table.num_columns)
         frame.pin += 1
         page_range: PageRange = frame.page_range
 
@@ -151,10 +162,18 @@ class Query:
 
       for rid in rids:
         page_range_index, base_page_index, slot = self.table.page_directory[rid]
+
+        # Get the needed page range
+        frame: Frame = self.bufferpool.get_frame(self.table.name, page_range_index, self.table.num_columns)
+        frame.pin += 1
+        page_range: PageRange = frame.page_range
+
         # We know we can read from a base record because the rid in a page directory points to a page record
-        record_data = self.table.page_ranges[page_range_index].read_base_record(base_page_index, slot, projected_columns_index)
+        record_data = page_range.read_base_record(base_page_index, slot, projected_columns_index)
         record = self.__build_record(record_data, search_key)
         records.append(record)
+
+        frame.pin -= 1
 
       return records
     """
@@ -179,9 +198,14 @@ class Query:
           version_num = 0
           current_rid = base_record.indirection
           page_range_index, tail_index, tail_slot = self.table.page_directory[current_rid]
+
+          frame: Frame = self.bufferpool.get_frame(self.table.name, page_range_index,
+                                                   self.table.num_columns)
+          frame.pin += 1
+          page_range: PageRange = frame.page_range
           return_base_record = False
           # Get the tail record
-          tail_record = self.table.page_ranges[page_range_index].read_tail_record(tail_index, tail_slot, projected_columns_index)
+          tail_record = page_range.read_tail_record(tail_index, tail_slot, projected_columns_index)
           # if the indirection for the tail record is the base record rid we hit the end, so just return the base record
           # else combine the data from the latest tail with columns that haven't been updated in base.
           while version_num > relative_version:
@@ -190,9 +214,11 @@ class Query:
               break
             current_rid = tail_record[config.INDIRECTION_COLUMN]
             page_range_index, tail_index, tail_slot = self.table.page_directory[current_rid]
-            tail_record = self.table.page_ranges[page_range_index].read_tail_record(tail_index, tail_slot,
+            tail_record = page_range.read_tail_record(tail_index, tail_slot,
                                                                                     projected_columns_index)
             version_num -= 1
+
+          frame.pin -= 1
 
           # relative_version < version_num means that we ran out of versions to traverse
           if return_base_record or relative_version < version_num:
@@ -218,14 +244,28 @@ class Query:
     # Returns False if no records exist with given key or if the target record cannot be accessed due to 2PL locking
     """
     def update(self, primary_key, *columns):
+      pk_column = self.table.key
+      # You shouldn't be allowed to change the primary key
+      if columns[pk_column] != None and primary_key != columns[pk_column]:
+        return False
+
       rids = self.table.index.locate(self.table.key, primary_key)
+
+      # Now that we have the RIDS, lets remove the old version of the records from our index, but this will
+      # be done after we are done updating
+      old_records = self.select(primary_key, self.table.index.key, [1] * self.table.num_columns)
 
       if rids == None:
         return False
 
       for rid in rids:
         page_range_index, base_page_index, base_slot = self.table.page_directory[rid]
-        page_range = self.table.page_ranges[page_range_index]
+
+        frame: Frame = self.bufferpool.get_frame(self.table.name, page_range_index,
+                                                 self.table.num_columns)
+        frame.pin += 1
+        page_range: PageRange = frame.page_range
+
         base_record = page_range.read_base_record(base_page_index, base_slot, [0] * self.table.num_columns)
 
         if base_record[config.INDIRECTION_COLUMN] == 0:
@@ -279,22 +319,22 @@ class Query:
           page_range.update_base_record_column(base_page_index, base_slot, config.SCHEMA_ENCODING_COLUMN,
                                                tail_schema_encoding_num)
 
+        frame.is_dirty = True
+        frame.pin -= 1
 
 
+      new_records = self.select(primary_key, self.table.index.key, [1] * self.table.num_columns)
+      # Remove the old records from the index and...
+      for record in old_records:
+        full_record = [record.indirection, record.rid, record.timestamp, record.schema_encoding]
+        full_record = full_record + record.columns
+        self.table.index.delete(full_record)
 
-        # From here there are two cases...
-        # Case 1: We only have a base record (aka indirection is 0)
-        # - make a tail record
-        # - update the indirection of the base record
-        # - make indirection of the tail record be the base record
-        # - update the schema encoding of the base the record as well
-        # Case 2: We have a tail record, (aka indirection is not 0)
-        # - get to that tail record
-        # - make a tail record
-        # - still update the indirection of the base record
-        # - get the tail record and add updates to it
-        # - change indirection of base record to point to new base record
-
+      # add in the new records
+      for record in new_records:
+        full_record = [record.indirection, record.rid, record.timestamp, record.schema_encoding]
+        full_record = full_record + record.columns
+        self.table.index.add(full_record)
 
 
       return True
