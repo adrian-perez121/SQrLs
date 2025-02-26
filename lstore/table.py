@@ -38,7 +38,7 @@ class Table:
       
 
     def add_new_page_range(self):
-      if self.bufferpool.get_frame(self.name, self.page_ranges_index, self.num_columns).page_range.has_base_page_capacity():
+      if not self.bufferpool.get_frame(self.name, self.page_ranges_index, self.num_columns).page_range.has_base_page_capacity():
         self.page_ranges_index += 1
 
     def merge(self):

@@ -69,7 +69,7 @@ class Query:
             tail_record = page_range.read_tail_record(tail_index, tail_slot,
                                                                                    [0] * self.table.num_columns)
 
-            page_range_index.update_tail_record_column(tail_index, tail_slot, config.RID_COLUMN,
+            page_range.update_tail_record_column(tail_index, tail_slot, config.RID_COLUMN,
                                                                               0)
             current_rid = tail_record[config.INDIRECTION_COLUMN]
 

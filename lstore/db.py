@@ -1,3 +1,5 @@
+import pickle
+import os
 from lstore.bufferpool import BufferPool
 from lstore.table import Table
 
@@ -11,9 +13,16 @@ class Database():
     def open(self, path):
         self.start_path = path
         self.bufferpool = BufferPool(self.start_path)
+        tables_path: str = self.start_path + "/tables/pickle.pkl"
+        if os.path.exists(tables_path):
+            with open(tables_path, 'rb') as file:
+                self.tables = pickle.load(file)
 
     def close(self):
         self.bufferpool.on_close()
+        if self.start_path:
+            with open(self.start_path + "/tables/pickle.pkl", 'wb') as file:
+                pickle.dump(self.tables, file)
 
     """
     # Creates a new table
