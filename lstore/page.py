@@ -30,4 +30,32 @@ class Page:
   def read(self, slot):
     if slot > 512 or slot < 0 or slot >= self.num_records: raise IndexError("Index out of range")
 
+<<<<<<< Updated upstream
     return int.from_bytes(self.data[slot * 8: (slot + 1) * 8], byteorder='big')
+=======
+    return int.from_bytes(self.data[slot * 8: (slot + 1) * 8], byteorder='big')
+
+  def to_dict(self):
+    data = {}
+    data["num_records"] = self.num_records
+    data["byte_array"] = base64.b64encode(self.data).decode('utf-8')
+    return data
+
+  def to_json_string(self):
+    return json.dumps(self.to_dict())
+
+  @classmethod
+  def from_json_string(cls, json_data):
+    data = json.loads(json_data)
+    new_page = Page()
+    new_page.data = base64.b64decode(data["byte_array"])
+    new_page.num_records = data["num_records"]
+    return new_page
+  
+  @classmethod
+  def from_dict(cls, data):
+      """Reconstruct a Page object from a dictionary."""
+      obj = cls()
+      obj.__dict__.update(data)  # Assuming simple dictionary-based restoration
+      return obj
+>>>>>>> Stashed changes
