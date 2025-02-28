@@ -1,3 +1,4 @@
+from lstore.bufferpool import BufferPool
 from lstore.index import Index
 from lstore.page_range import PageRange
 from time import time
@@ -22,13 +23,12 @@ class Table:
         self.name: str = name
         self.key = key
         self.num_columns = num_columns
-        self.page_ranges = [PageRange(num_columns)] # Diego: I think with my bufferpool implementation we might be able to remove this
         self.page_ranges_index = 0
         self.page_directory = {}
         self.index: Index = Index(self)
         self.rid = 1
 
-        self.bufferpool = bufferpool
+        self.bufferpool: BufferPool = bufferpool
         pass
 
     def new_rid(self):
@@ -42,7 +42,6 @@ class Table:
         self.page_ranges_index += 1
 
     def merge(self):
-
       merge_thread = threading.Thread(target=self.__merge, name="MergeThread")
       merge_thread.start()
 
