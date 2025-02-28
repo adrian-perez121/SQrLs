@@ -9,12 +9,11 @@ class PageRange:
     self.regular_columns = num_columns
     self.total_columns = self.meta_data_columns + self.regular_columns
     self.base_pages = [ConceptualPage(num_columns)]
-    self.base_pages_index = 0
-    self.base_pages_slot = 0
+    self.base_pages_index = 0 # M3: TODO: Atomize
+    self.base_pages_slot = 0 # M3: TODO: Atomize
     self.tail_pages = [ConceptualPage(num_columns)]
-    self.tail_pages_index = 0
-    self.tail_pages_slot = 0
-    self.tail_page_directory = {}
+    self.tail_pages_index = 0 # M3: TODO: Atomize
+    self.tail_pages_slot = 0 # M3: TODO: Atomize
 
   def has_base_page_capacity(self):
     """
@@ -98,5 +97,27 @@ class PageRange:
     """
     self.tail_pages[tail_page_index].update_column(column, tail_page_slot, data)
 
+  def to_dict(self):
+    data = {}
+    data["meta_data_columns"] = self.meta_data_columns
+    data["regular_columns"] = self.regular_columns
+    data["base_pages"] = [page.to_dict() for page in self.base_pages]
+    data["base_pages_index"] = self.base_pages_index
+    data["base_pages_slot"] = self.base_pages_slot
+    data["tail_pages"] = [page.to_dict() for page in self.tail_pages]
+    data["tail_pages_index"] = self.tail_pages_index
+    data["tail_pages_slot"] = self.tail_pages_slot
+    return data
 
+  @classmethod
+  def from_dict(cls, data):
+      new_page_range = cls(data["regular_columns"])  # ✅ Initialize properly
+      new_page_range.meta_data_columns = data["meta_data_columns"]
+      new_page_range.base_pages = [ConceptualPage.from_dict(page) for page in data["base_pages"]]
+      new_page_range.base_pages_index = data["base_pages_index"]
+      new_page_range.base_pages_slot = data["base_pages_slot"]
+      new_page_range.tail_pages = [ConceptualPage.from_dict(page) for page in data["tail_pages"]]
+      new_page_range.tail_pages_index = data["tail_pages_index"]
+      new_page_range.tail_pages_slot = data["tail_pages_slot"]
 
+      return new_page_range

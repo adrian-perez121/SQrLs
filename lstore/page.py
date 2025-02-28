@@ -30,9 +30,6 @@ class Page:
   def read(self, slot):
     if slot > 512 or slot < 0 or slot >= self.num_records: raise IndexError("Index out of range")
 
-<<<<<<< Updated upstream
-    return int.from_bytes(self.data[slot * 8: (slot + 1) * 8], byteorder='big')
-=======
     return int.from_bytes(self.data[slot * 8: (slot + 1) * 8], byteorder='big')
 
   def to_dict(self):
@@ -58,4 +55,3 @@ class Page:
       obj = cls()
       obj.__dict__.update(data)  # Assuming simple dictionary-based restoration
       return obj
->>>>>>> Stashed changes
