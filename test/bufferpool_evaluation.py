@@ -99,30 +99,34 @@ for num_frames in frame_counts:
     evaluate_evict_frame(buffer_pool, num_frames)
     evaluate_read_frame(buffer_pool, num_frames)
 
-# ----------- PLOT RESULTS -----------
-fig, axes = plt.subplots(2, 2, figsize=(14, 10))
-axes = axes.flatten()
-fig.suptitle("Buffer Pool Performance", fontsize=16, fontweight="bold")
+# ----------- PLOT TOTAL EXECUTION TIME -----------
 
-for i, (key, data) in enumerate(results.items()):
-    if not data:
-        continue
+# Compute total execution times per frame count
+total_times = []
+frame_sizes = [50, 100, 500, 1000]
 
-    x_vals = [d[0] for d in data]  # frames
-    y_vals = [d[1] for d in data]  # time(s)
+for i in range(len(frame_sizes)):
+    total_time = (
+        results["Request Frame"][i][1] +
+        results["Write Frame"][i][1] +
+        results["Evict Frame"][i][1] +
+        results["Read Frame"][i][1]
+    )
+    total_times.append(total_time)
 
-    axes[i].plot(x_vals, y_vals, marker='o', linestyle='-', color=colors[key], label=key)
+# Create a single plot for total execution time across different frame sizes
+plt.figure(figsize=(10, 6))
+plt.plot(frame_sizes, total_times, marker='o', linestyle='-', color="#007bff", label="Total Execution Time")
 
-    axes[i].set_xticks(frame_counts)
-    axes[i].set_xticklabels(["50", "100", "500", "1000"])
+# Formatting the plot
+plt.xticks(frame_sizes, ["50", "100", "500", "1000"])
+plt.xlabel("Number of Frames")
+plt.ylabel("Total Execution Time (s)")
+plt.title("Total Buffer Pool Time")
+plt.grid(True, linestyle="--", alpha=0.6)
+plt.legend()
 
-    axes[i].set_title(key, fontsize=14, fontweight="bold", color=colors[key])
-    axes[i].set_xlabel("Number of Frames")
-    axes[i].set_ylabel("Execution Time (s)")
-    axes[i].grid(True, linestyle="--", alpha=0.6)
-    axes[i].legend()
-
-plt.tight_layout()
-plt.subplots_adjust(top=0.9)
+# Display the plot
 plt.show()
+
 

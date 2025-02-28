@@ -114,10 +114,16 @@ def evaluate_sum(query, start_key, end_key, column_index):
                 max_key = min(max_key, max(inserted_keys))  # safe to not exceed dataset size
 
             print(f"SUM Query: Range {min_key} - {max_key} ({max_key - min_key} records)")
-            query.sum(min_key, max_key, column_index)
+            
+            # ✅ FIX: Capture the result of `query.sum()`
+            result = query.sum(min_key, max_key, column_index)
+            
+            # ✅ PRINT the actual summed value
+            print(f"SUM Query Result: {result}")
 
     duration = time.time() - start_time
     results["Sum"].append((end_key - start_key + 1, duration))
+
 
 # ----------- DELETE -----------
 def evaluate_delete(query, num_records):
