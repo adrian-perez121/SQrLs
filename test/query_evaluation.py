@@ -88,8 +88,8 @@ ax.set_facecolor('#1B1B2F')
 ax.set_xlabel("Number of Queries", color="white")
 ax.set_ylabel("Execution Time (s)", color="white")
 ax.set_title("Query Performance", color="white")
-ax.set_xscale("log")
-ax.set_yscale("log")
+ax.set_xscale("linear")
+ax.set_yscale("linear")
 ax.grid(True, linestyle="--", alpha=0.4, color="white")
 
 # axis limits
@@ -97,10 +97,10 @@ ax.set_xlim(100, 1000000)
 ax.set_ylim(0.0005, 10)  
 
 # ticks
-ax.set_xticks([100, 1000, 10000, 100000, 1000000])
-ax.set_xticklabels([100, 1000, 10000, 100000, 1000000], color="white")
-ax.set_yticks([0.0005, 0.001, 0.01, 0.1, 1, 10])
-ax.set_yticklabels(["0.0005", "0.001", "0.01", "0.1", "1", "10"], color="white")
+ax.set_xticks([0, 200000, 400000, 600000, 800000, 1000000])
+ax.set_xticklabels([0, 200000, 400000, 600000, 800000, 1000000], color="white")
+ax.set_yticks([0, 2, 4, 6, 8, 10])
+ax.set_yticklabels(["0", "2", "4", "6", "8", "10"], color="white")
 
 # animated lines
 lines = {
@@ -123,10 +123,12 @@ def update(frame):
     for key, line in lines.items():
         data = results[key]
         if len(data) > 1:
-            x, y = create_line(data, 100)
-            line.set_data(x[:frame], y[:frame])  # draw line progressively
+            x = np.array([d[0] for d in data])
+            y = np.array([d[1] for d in data])
+            line.set_data(x[:frame], y[:frame])  # real data
     ax.legend(loc="upper left", fontsize=10, facecolor="#1B1B2F", edgecolor="white", labelcolor="white")
     return lines.values()
+
 
 if __name__ == "__main__":
     db = Database()

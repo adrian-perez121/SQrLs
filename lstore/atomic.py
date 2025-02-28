@@ -1,16 +1,15 @@
 import copy
 from queue import Queue
 from threading import Event, Thread
-from typing import Callable, Generic, Optional, Self, Tuple, TypeVar
+from typing import Callable, Generic, Optional, Tuple, TypeVar, Union
 
 T = TypeVar("T")
-
 
 class Atomic(Generic[T]):
     """Wrapper for variables so that modifications of the same variable
     across different threads are handled sequentially"""
 
-    def __init__(self, var: T) -> Self:
+    def __init__(self, var: T):
         self.var: T = var
         self._queue: Queue[
             Tuple[Callable[[T], T], Optional[Callable[[T], None]], bool]
@@ -31,7 +30,7 @@ class Atomic(Generic[T]):
     def modify(
         self,
         callable: Callable[[T], T],
-        after: Callable[[T], None] | None = None,
+        after: Union[Callable[[T], None]] | None = None,
         pass_old: bool = False,
     ) -> None:
         self._queue.put((callable, after, pass_old))

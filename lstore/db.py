@@ -1,32 +1,27 @@
-from lstore.table import Table
-import lstore.config
-import os
 import pickle
+import os
+from lstore.bufferpool import BufferPool
+from lstore.table import Table
 
 class Database():
 
     def __init__(self):
-        self.tables = {}
+        self.tables: dict[str, Table] = {}
         self.start_path = None
+        self.bufferpool: BufferPool = None
 
-    # Required for milestone2
-    def open(self, path = None):
-        # TODO: Initialize a Bufferpool object
-        if path:
-            self.start_path = path
-
-            if os.path.exists(path):
-                with open(path + "/table_names", "rb") as file:
-                    self.tables = pickle.load(file)
-            else:
-                os.makedirs(path, exist_ok=True)
-                os.makedirs(path + "/Tables", exist_ok=True)
+    def open(self, path):
+        self.start_path = path
+        self.bufferpool = BufferPool(self.start_path)
+        tables_path: str = self.start_path + "/tables/pickle.pkl"
+        if os.path.exists(tables_path):
+            with open(tables_path, 'rb') as file:
+                self.tables = pickle.load(file)
 
     def close(self):
-        # TODO: Run on close for bufferpool
-        # Write the hash into a pickle file for later
+        self.bufferpool.on_close()
         if self.start_path:
-            with open(self.start_path + "/table_names", 'wb') as file:
+            with open(self.start_path + "/tables/pickle.pkl", 'wb') as file:
                 pickle.dump(self.tables, file)
 
     """
@@ -35,14 +30,13 @@ class Database():
     :param num_columns: int     #Number of Columns: all columns are integer
     :param key: int             #Index of table key in columns
     """
-    def create_table(self, name, num_columns, key_index):
+    def create_table(self, name: str, num_columns: int, key_index: int):
         if name in self.tables:
             raise  "Table already exists"
 
-        table = Table(name, num_columns, key_index)
+        table = Table(name, num_columns, key_index, self.bufferpool)
         self.tables[name] = table
         return table
-
 
     """
     # Deletes the specified table

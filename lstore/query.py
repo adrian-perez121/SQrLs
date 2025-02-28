@@ -1,10 +1,11 @@
 import time
 
+from lstore.bufferpool import BufferPool, Frame
+from lstore.page_range import PageRange
 from lstore.table import Table
 from lstore.record import Record
 import lstore.config as config
 from datetime import datetime
-
 
 class Query:
     """
@@ -13,8 +14,9 @@ class Query:
     Queries that succeed should return the result or True
     Any query that crashes (due to exceptions) should return False
     """
-    def __init__(self, table):
+    def __init__(self, table: Table):
         self.table: Table = table
+        self.bufferpool: BufferPool = table.bufferpool
         pass
 
     def create_metadata(self, rid, indirection = 0, schema = 0):
@@ -38,6 +40,7 @@ class Query:
     # Return False if record doesn't exist or is locked due to 2PL
     """
     def delete(self, primary_key):
+        # After your all done, remove the primary key from the primary key index
         rids = self.table.index.locate(self.table.key, primary_key).copy()
 
         if not rids:
@@ -45,27 +48,34 @@ class Query:
 
         for rid in rids:
           page_range_index, base_page_index, base_slot = self.table.page_directory[rid]
-          page_range = self.table.page_ranges[page_range_index]
+
+          frame: Frame = self.bufferpool.get_frame(self.table.name, page_range_index,
+                                                   self.table.num_columns)
+          frame.pin += 1
+          page_range: PageRange = frame.page_range
+
           base_record = page_range.read_base_record(base_page_index, base_slot, [1] * self.table.num_columns)
 
-          if page_range_index is None:
-            return False
 
           base_rid = rid
           page_range.update_base_record_column(base_page_index, base_slot, config.RID_COLUMN, 0)
+
           current_rid = base_record[config.INDIRECTION_COLUMN]
-
           while current_rid and current_rid != base_rid:
+            # We know we don't have to get a new frame because any update to a base record in a page range goes to a
+            # tail record in the same page range
             page_range_index, tail_index, tail_slot = self.table.page_directory[current_rid]
-            if page_range_index is None:
-              break
-            tail_record = self.table.page_ranges[page_range_index].read_tail_record(tail_index, tail_slot, [0] * self.table.num_columns)
 
-            self.table.page_ranges[page_range_index].update_tail_record_column(tail_index, tail_slot, config.RID_COLUMN, 0)
+            tail_record = page_range.read_tail_record(tail_index, tail_slot,
+                                                                                   [0] * self.table.num_columns)
+
+            page_range.update_tail_record_column(tail_index, tail_slot, config.RID_COLUMN,
+                                                                              0)
             current_rid = tail_record[config.INDIRECTION_COLUMN]
 
           self.table.index.delete(base_record)
-          # self.table.index.remove(primary_key, rid)
+          frame.is_dirty = True
+          frame.pin -= 1
           self.table.page_directory[rid] = None
 
         return True
@@ -100,7 +110,15 @@ class Query:
           return False
 
         rid = self.table.new_rid()
-        page_range = self.table.page_ranges[self.table.page_ranges_index]  # Get a page range we can write into
+        # TODO: Request Page logic (???) maybe link page range logic to bufferpool
+        # bufferpool request range (self.table, index)
+        print(f"Insert on Page Range {self.table.name}, {self.table.page_ranges_index}, {self.table.num_columns}")
+        frame: Frame = self.bufferpool.get_frame(self.table.name, self.table.page_ranges_index, self.table.num_columns)
+        frame.pin += 1
+        page_range: PageRange = frame.page_range
+
+        frame.is_dirty = True
+        # TODO: Decrement Pin Count
 
         # Create an array with the metadata columns, and then add in the regular data columns
         new_record = self.create_metadata(rid)
@@ -113,31 +131,12 @@ class Query:
         self.table.index.add(new_record)
       # - add the record in the index
 
+        frame.pin -= 1
+
+        # TODO: Question, why?
         self.table.add_new_page_range()
 
         return True
-      
-    def _insert_experiment(self, *columns):
-      if len(columns) != self.table.num_columns: # Thread Safe
-        return False # Thread Safe
-
-      rid = self.table.new_rid()
-      page_range = self.table.page_ranges[self.table.page_ranges_index]  # Get a page range we can write into
-
-      # Create an array with the metadata columns, and then add in the regular data columns
-      new_record = self.create_metadata(rid)
-      for data in columns:
-        new_record.append(data)
-      # - write this record into the table
-      index, slot = page_range.write_base_record(new_record)
-      # - add the RID and location into the page directory
-      self.table.page_directory[rid] = (self.table.page_ranges_index, index, slot)
-      self.table.index.add(new_record)
-    # - add the record in the index
-
-      self.table.add_new_page_range()
-
-      return True
 
     """
     # Read matching record with specified search key
@@ -152,7 +151,6 @@ class Query:
       # Select wants the latest version so this is select version 0
       return self.select_version(search_key, search_key_index, projected_columns_index, 0)
 
-
     def __select_base_records(self, search_key, search_key_index, projected_columns_index):
       records = []
       rids = self.table.index.locate(search_key_index, search_key)
@@ -162,10 +160,18 @@ class Query:
 
       for rid in rids:
         page_range_index, base_page_index, slot = self.table.page_directory[rid]
+
+        # Get the needed page range
+        frame: Frame = self.bufferpool.get_frame(self.table.name, page_range_index, self.table.num_columns)
+        frame.pin += 1
+        page_range: PageRange = frame.page_range
+
         # We know we can read from a base record because the rid in a page directory points to a page record
-        record_data = self.table.page_ranges[page_range_index].read_base_record(base_page_index, slot, projected_columns_index)
+        record_data = page_range.read_base_record(base_page_index, slot, projected_columns_index)
         record = self.__build_record(record_data, search_key)
         records.append(record)
+
+        frame.pin -= 1
 
       return records
     """
@@ -190,9 +196,14 @@ class Query:
           version_num = 0
           current_rid = base_record.indirection
           page_range_index, tail_index, tail_slot = self.table.page_directory[current_rid]
+
+          frame: Frame = self.bufferpool.get_frame(self.table.name, page_range_index,
+                                                   self.table.num_columns)
+          frame.pin += 1
+          page_range: PageRange = frame.page_range
           return_base_record = False
           # Get the tail record
-          tail_record = self.table.page_ranges[page_range_index].read_tail_record(tail_index, tail_slot, projected_columns_index)
+          tail_record = page_range.read_tail_record(tail_index, tail_slot, projected_columns_index)
           # if the indirection for the tail record is the base record rid we hit the end, so just return the base record
           # else combine the data from the latest tail with columns that haven't been updated in base.
           while version_num > relative_version:
@@ -201,9 +212,11 @@ class Query:
               break
             current_rid = tail_record[config.INDIRECTION_COLUMN]
             page_range_index, tail_index, tail_slot = self.table.page_directory[current_rid]
-            tail_record = self.table.page_ranges[page_range_index].read_tail_record(tail_index, tail_slot,
+            tail_record = page_range.read_tail_record(tail_index, tail_slot,
                                                                                     projected_columns_index)
             version_num -= 1
+
+          frame.pin -= 1
 
           # relative_version < version_num means that we ran out of versions to traverse
           if return_base_record or relative_version < version_num:
@@ -231,7 +244,7 @@ class Query:
     def update(self, primary_key, *columns):
       pk_column = self.table.key
       # You shouldn't be allowed to change the primary key
-      if columns[pk_column] != None and primary_key != columns[pk_column]:
+      if columns[pk_column] is not None and primary_key != columns[pk_column]:
         return False
 
       rids = self.table.index.locate(self.table.key, primary_key)
@@ -240,12 +253,17 @@ class Query:
       # be done after we are done updating
       old_records = self.select(primary_key, self.table.index.key, [1] * self.table.num_columns)
 
-      if rids == None:
+      if rids is None:
         return False
 
       for rid in rids:
         page_range_index, base_page_index, base_slot = self.table.page_directory[rid]
-        page_range = self.table.page_ranges[page_range_index]
+
+        frame: Frame = self.bufferpool.get_frame(self.table.name, page_range_index,
+                                                 self.table.num_columns)
+        frame.pin += 1
+        page_range: PageRange = frame.page_range
+
         base_record = page_range.read_base_record(base_page_index, base_slot, [0] * self.table.num_columns)
 
         if base_record[config.INDIRECTION_COLUMN] == 0:
@@ -254,13 +272,13 @@ class Query:
 
           # Set ones for the changed things
           for i, data in enumerate(columns):
-            if data != None:
+            if data is not None:
               updated_schema_encoding[i] = 1
           schema_encoding_num = self.__bit_array_to_number(updated_schema_encoding)
 
           record_data = self.create_metadata(tail_rid, base_record[config.RID_COLUMN], schema_encoding_num)
           for data in columns:
-            if data != None:
+            if data is not None:
               record_data.append(data)
             else:
               record_data.append(0)
@@ -280,13 +298,13 @@ class Query:
           new_tail_rid = self.table.new_rid()
 
           for i, data in enumerate(columns):
-            if data != None: # Combining schema encodings
+            if data is not None: # Combining schema encodings
               base_record_updated_schema_encoding[i] = 1
           tail_schema_encoding_num = self.__bit_array_to_number(base_record_updated_schema_encoding)
 
           new_tail_record_data = self.create_metadata(new_tail_rid, latest_tail_rid, tail_schema_encoding_num)
           for i, data in enumerate(columns):
-            if data != None:
+            if data is not None:
               new_tail_record_data.append(data)
             elif latest_tail_record[i + 4]: # If there's data actually there
               new_tail_record_data.append(latest_tail_record[i + 4]) # Offset for metadata columns
@@ -299,36 +317,22 @@ class Query:
           page_range.update_base_record_column(base_page_index, base_slot, config.SCHEMA_ENCODING_COLUMN,
                                                tail_schema_encoding_num)
 
-        # Now get our newly updated records
-      new_records = self.select(primary_key, self.table.index.key, [1] * self.table.num_columns)
+        frame.is_dirty = True
+        frame.pin -= 1
 
-        # Remove the old records from the index and...
+
+      new_records = self.select(primary_key, self.table.index.key, [1] * self.table.num_columns)
+      # Remove the old records from the index and...
       for record in old_records:
-          full_record = [record.indirection, record.rid, record.timestamp, record.schema_encoding]
-          full_record = full_record + record.columns
-          self.table.index.delete(full_record)
+        full_record = [record.indirection, record.rid, record.timestamp, record.schema_encoding]
+        full_record = full_record + record.columns
+        self.table.index.delete(full_record)
 
       # add in the new records
       for record in new_records:
-          full_record = [record.indirection, record.rid, record.timestamp, record.schema_encoding]
-          full_record = full_record + record.columns
-          self.table.index.add(full_record)
-
-
-
-        # From here there are two cases...
-        # Case 1: We only have a base record (aka indirection is 0)
-        # - make a tail record
-        # - update the indirection of the base record
-        # - make indirection of the tail record be the base record
-        # - update the schema encoding of the base the record as well
-        # Case 2: We have a tail record, (aka indirection is not 0)
-        # - get to that tail record
-        # - make a tail record
-        # - still update the indirection of the base record
-        # - get the tail record and add updates to it
-        # - change indirection of base record to point to new base record
-
+        full_record = [record.indirection, record.rid, record.timestamp, record.schema_encoding]
+        full_record = full_record + record.columns
+        self.table.index.add(full_record)
 
 
       return True
@@ -345,7 +349,8 @@ class Query:
       total_sum = 0
       rids = []
       for primary_key in range(start_range, end_range + 1):
-        record = self.select(primary_key, self.table.key, [1 if i == aggregate_column_index else 0 for i in range(self.table.num_columns)])
+        record = self.select(primary_key, self.table.key,
+                                     [1 if i == aggregate_column_index else 0 for i in range(self.table.num_columns)])
         if record and record is not False:
           value_to_sum = record[0].columns[aggregate_column_index]
           if value_to_sum is None:
@@ -372,7 +377,8 @@ class Query:
       total_sum = 0
       rids = []
       for primary_key in range(start_range, end_range + 1):
-        record = self.select_version(primary_key, self.table.key, [1 if i == aggregate_column_index else 0 for i in range(self.table.num_columns)], relative_version)
+        record = self.select_version(primary_key, self.table.key,
+                             [1 if i == aggregate_column_index else 0 for i in range(self.table.num_columns)], relative_version)
         if record and record is not False:
           value_to_sum = record[0].columns[aggregate_column_index]
           if value_to_sum is None:

@@ -1,7 +1,6 @@
-from queue import Queue
-
-from BTrees._OOBTree import OOBTree
+from BTrees.OOBTree import OOBTree
 import lstore.config as config
+
 """
 A data strucutre holding indices for various columns of a table. Key column should be indexd by default, other columns can be indexed through this object. Indices are usually B-Trees, but other data structures can be used as well.
 """
@@ -16,76 +15,71 @@ A data strucutre holding indices for various columns of a table. Key column shou
 # The tree is made up of key, value pairs where the key is value in a column and value is an RID which
 # can later be used by the page range.
 
+
 class Index:
-
     def __init__(self, table):
-      # One index for each table. All our empty initially.
-      self.table = table
-      self.indices = [None] *  table.num_columns
-      self.key = table.key
-      self.indices[self.key] = OOBTree()
-
-
+        # One index for each table. All our empty initially.
+        self.indices: list = [None] * table.num_columns
+        self.key = table.key
+        self.indices[self.key] = OOBTree()
 
     def add(self, record):
-      """
-      A method for adding something to the index. This method would most likely be used during the
-      insert query. From the record the RID can be extracted and then for the columns that contain
-      indexes, the data from that column can also be added into the Btree.
-      """
-      rid = record[config.RID_COLUMN]
+        """
+        A method for adding something to the index. This method would most likely be used during the
+        insert query. From the record the RID can be extracted and then for the columns that contain
+        indexes, the data from that column can also be added into the Btree.
+        """
+        rid = record[config.RID_COLUMN]
 
-      for i, column_index in enumerate(self.indices):
-        # We have to do i + 4 because the first 4 columns are metadata columns. In other words, I am aligning
-        key = record[i + 4]
-        if column_index is not None:
-
-          # If we are going to allow duplicate values we should store RIDs in a set. RIDs are for certain unique
-          if key not in column_index:
-            column_index[key] = set()
-          # All nodes should contain sets
-          column_index[key].add(rid)
-
+        for i, column_index in enumerate(self.indices):
+            # We have to do i + 4 because the first 4 columns are metadata columns. In other words, I am aligning
+            key = record[i + 4]
+            if column_index != None:
+                # If we are going to allow duplicate values we should store RIDs in a set. RIDs are for certain unique
+                if key not in column_index:
+                    column_index[key] = set()
+                # All nodes should contain sets
+                column_index[key].add(rid)
 
     def delete(self, record):
-      """
-      This method would be used in the
-      delete query. When a record is deleted you also call delete on the index. The RID is extracted
-      and for each column that has an index, we search the index. For now this only works with unique primary keys
-      """
-      rid = record[config.RID_COLUMN]
-      for i, column_index in enumerate(self.indices):
-        if column_index is not None:
-          key = record[i + 4]
-          if key in column_index:
-            # Recall the tree keys are SETs with RIDs
-            column_index[key].remove(rid)
-            # If the set is empty might as well delete thr key from the tree
-            if len(column_index[key]) == 0 :
-              del column_index[key]
-          else:
-            raise Exception("They key was in the index")
+        """
+        This method would be used in the
+        delete query. When a record is deleted you also call delete on the index. The RID is extracted
+        and for each column that has an index, we search the index. For now this only works with unique primary keys
+        """
+        rid = record[config.RID_COLUMN]
+        for i, column_index in enumerate(self.indices):
+            if column_index != None:
+                key = record[i + 4]
+                if key in column_index:
+                    # Recall the tree keys are SETs with RIDs
+                    column_index[key].remove(rid)
+                    # If the set is empty might as well delete thr key from the tree
+                    if len(column_index[key]) == 0:
+                        del column_index[key]
+                else:
+                    raise Exception("They key was in the index")
 
     """
     # returns the location of all records with the given value on column "column"
     """
 
     def locate(self, column, value):
-      # Search down an index for a specific set of RIDs. If it's not found, then it doesn't exist
-      tree = self.indices[column]
-      if value not in tree:
-        return None
+        # Search down an index for a specific set of RIDs. If it's not found, then it doesn't exist
+        tree = self.indices[column]
+        if value not in tree:
+            return None
 
-      return tree[value] # For now this returns a set of RIDs
+        return tree[value]  # For now this returns a set of RIDs
 
     """
     # Returns the RIDs of all records with values in column "column" between "begin" and "end"
     """
 
     def locate_range(self, begin, end, column):
-      # This one confuses me a bit too. Not the most efficient way but we could start with an empty
-      # array then we iterate from begin to end and append each of the RIDs in the set to this array.
-      # By the end of the function we should have an array with all RIDs that were within the specified range.
+        # This one confuses me a bit too. Not the most efficient way but we could start with an empty
+        # array then we iterate from begin to end and append each of the RIDs in the set to this array.
+        # By the end of the function we should have an array with all RIDs that were within the specified range.
         pass
 
     """
@@ -93,38 +87,16 @@ class Index:
     """
 
     def create_index(self, column_number):
-        # We are going to grab every thing that has been index, and use a query to get the latest version of the data
-        # Then we put this version into the new indexed column
-
-        # This needs to be done in here to prevent errors
-        from lstore.query import Query
-        query = Query(self.table)
-
-        if (self.indices[column_number]):
-            raise IndexError("An index for this column already exists")
-
-
-        # Create the new Btree
-        self.indices[column_number] = OOBTree()
-
-        # Grab all the rids in the primary key
-        for key in self.indices[self.key].keys():
-            records = query.select(key, self.key, [1] * self.table.num_columns)
-            for record in records:
-                # This includes the meta_data columns which is why it looks so weird
-                full_record = [record.indirection, record.rid, record.timestamp, record.schema_encoding]
-                full_record = full_record + record.columns
-                self.add(full_record)
-
-
-
-
+        # This function is going to take TIME. My idea is that we can use the primary key index to get all the RIDs
+        # then we can use these RIDs to find the records in the table. From here we can read the column needed
+        # and insert into the new tree along with RID. This is going to take time because we need to first get all the RIDs
+        # then we have to read from the table. THEN we insert into the new tree.
+        pass
 
     """
     # optional: Drop index of specific column
     """
 
     def drop_index(self, column_number):
-        del self.indices[column_number]
-
-
+        # just use del self.indices[column_number], though we shouldn't be allowed to delete the primary key column
+        pass

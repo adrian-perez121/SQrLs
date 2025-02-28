@@ -120,8 +120,3 @@ class PageRange:
     new_page_range.tail_pages_index = data["tail_pages_index"]
     new_page_range.tail_pages_slot = data["tail_pages_slot"]
     return new_page_range
-
-
-
-
-

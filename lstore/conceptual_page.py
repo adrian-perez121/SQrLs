@@ -1,9 +1,5 @@
 from lstore.page import Page  # Assuming your Page class is defined in page.py
-import lstore.config as config
-import os
-import shutil
 import json
-import base64
 
 class ConceptualPage:
   def __init__(self, num_columns):
@@ -168,8 +164,3 @@ class ConceptualPage:
 
     new_conceptual_page.pages = pages
     return new_conceptual_page
-
-
-
-
-

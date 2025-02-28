@@ -42,13 +42,6 @@ class Page:
     data["byte_array"] = base64.b64encode(self.data).decode('utf-8')
     return data
 
-  @classmethod
-  def from_dict(cls, data):
-    new_page = Page()
-    new_page.data = base64.b64decode(data["byte_array"])
-    new_page.num_records = data["num_records"]
-    return new_page
-
   def to_json_string(self):
     return json.dumps(self.to_dict())
 
