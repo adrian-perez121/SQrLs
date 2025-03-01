@@ -49,7 +49,7 @@ class BufferPool:
                     indices = [
                         int(f.split(".")[0])
                         for f in os.listdir(table_dir)
-                        if f.endswith(".json")
+                        if f.endswith(".json") and f.split(".")[0].isnumeric()
                     ]
                     index = max(indices, default=-1)
                     if index > -1:
@@ -97,7 +97,6 @@ class BufferPool:
                         table_name,
                         page_range_index,
                         PageRange.from_dict(json.load(file)),
-                        num_columns,
                         from_disk=True,
                     )
             except Exception as e:
