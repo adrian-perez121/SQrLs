@@ -32,8 +32,8 @@ class Index:
         rid = record[config.RID_COLUMN]
 
         for i, column_index in enumerate(self.indices):
-            # We have to do i + 4 because the first 4 columns are metadata columns. In other words, I am aligning
-            key = record[i + 4]
+            # We have to do i + config.NUM_META_COLUMNS because the first config.NUM_META_COLUMNS columns are metadata columns. In other words, I am aligning
+            key = record[i + config.NUM_META_COLUMNS]
             if column_index != None:
                 # If we are going to allow duplicate values we should store RIDs in a set. RIDs are for certain unique
                 if key not in column_index:
@@ -50,7 +50,7 @@ class Index:
         rid = record[config.RID_COLUMN]
         for i, column_index in enumerate(self.indices):
             if column_index != None:
-                key = record[i + 4]
+                key = record[i + config.NUM_META_COLUMNS]
                 if key in column_index:
                     # Recall the tree keys are SETs with RIDs
                     column_index[key].remove(rid)
@@ -58,7 +58,7 @@ class Index:
                     if len(column_index[key]) == 0:
                         del column_index[key]
                 else:
-                    raise Exception("They key was in the index")
+                    raise Exception("The key was not in the index")
 
     """
     # returns the location of all records with the given value on column "column"

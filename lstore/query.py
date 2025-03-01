@@ -24,7 +24,7 @@ class Query:
       Creates the metadata part of the record. Timestamp isn't included in the arguments because it is grabbed when this
       method is run.
       """
-      record = [None] * 4
+      record = [0] * config.NUM_META_COLUMNS
 
       record[config.RID_COLUMN] = rid
       record[config.INDIRECTION_COLUMN] = indirection
@@ -96,8 +96,10 @@ class Query:
       time = datetime.fromtimestamp(float(record_data[config.TIMESTAMP_COLUMN]))
       schema_encoding = self.__number_to_bit_array(record_data[config.SCHEMA_ENCODING_COLUMN], self.table.num_columns)
       # I'm sorry this is a little long
-      record = Record(record_data[config.INDIRECTION_COLUMN], record_data[config.RID_COLUMN], time, schema_encoding,
-                      search_key, record_data[4:])
+      record_data[config.TIMESTAMP_COLUMN] = time
+      record_data[config.SCHEMA_ENCODING_COLUMN] = schema_encoding
+
+      record = Record(record_data, search_key)
       return record
 
     def insert(self, *columns):
@@ -224,7 +226,7 @@ class Query:
             for i, data in enumerate(self.__number_to_bit_array(tail_record[config.SCHEMA_ENCODING_COLUMN], self.table.num_columns)):
               # Only add in the updated data
               if data == 1:
-                base_record.columns[i] = tail_record[4 + i]
+                base_record.columns[i] = tail_record[config.NUM_META_COLUMNS + i]
 
           version_records.append(base_record)
 
@@ -305,8 +307,8 @@ class Query:
           for i, data in enumerate(columns):
             if data is not None:
               new_tail_record_data.append(data)
-            elif latest_tail_record[i + 4]: # If there's data actually there
-              new_tail_record_data.append(latest_tail_record[i + 4]) # Offset for metadata columns
+            elif latest_tail_record[i + config.NUM_META_COLUMNS]: # If there's data actually there
+              new_tail_record_data.append(latest_tail_record[i + config.NUM_META_COLUMNS]) # Offset for metadata columns
             else:
               new_tail_record_data.append(0)
 
@@ -323,15 +325,11 @@ class Query:
       new_records = self.select(primary_key, self.table.index.key, [1] * self.table.num_columns)
       # Remove the old records from the index and...
       for record in old_records:
-        full_record = [record.indirection, record.rid, record.timestamp, record.schema_encoding]
-        full_record = full_record + record.columns
-        self.table.index.delete(full_record)
+        self.table.index.delete(record.entire_record)
 
       # add in the new records
       for record in new_records:
-        full_record = [record.indirection, record.rid, record.timestamp, record.schema_encoding]
-        full_record = full_record + record.columns
-        self.table.index.add(full_record)
+        self.table.index.add(record.entire_record)
 
 
       return True

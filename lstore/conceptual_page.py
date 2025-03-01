@@ -1,5 +1,6 @@
 from lstore.page import Page  # Assuming your Page class is defined in page.py
 import json
+from lstore.config import NUM_META_COLUMNS
 
 class ConceptualPage:
   def __init__(self, num_columns):
@@ -8,7 +9,7 @@ class ConceptualPage:
     :param num_columns: Number of data columns (excluding metadata columns).
     """
     self.num_records = 0  # Tracks the total number of records, also treated as next available slot
-    self.metadata_columns = 4  # Fixed number of metadata columns
+    self.metadata_columns = NUM_META_COLUMNS  # Fixed number of metadata columns
     self.regular_columns = num_columns
     self.total_columns = self.metadata_columns + self.regular_columns
     # For the sake of consistency, the first four columns should be the metadata columns
@@ -65,7 +66,7 @@ class ConceptualPage:
     physical_page_slot = slot % 512
     record = []
     for i in range(self.metadata_columns):
-      # the first 4 columns are the metadata columns
+      # the first NUM_META_COLUMNS columns are the metadata columns
       record.append(self.pages[i][physical_page_level].read(physical_page_slot))
 
     return record
