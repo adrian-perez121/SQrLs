@@ -69,7 +69,6 @@ class BufferPool:
             if not frame:
                 self.read_frame(table_name, page_range_index, num_columns)
                 frame = frames[page_range_index]
-                print(f"Read Frame {frame}")
                 
             frame.request_count += 1
             return frame
