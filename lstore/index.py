@@ -87,16 +87,31 @@ class Index:
     """
 
     def create_index(self, column_number):
-        # This function is going to take TIME. My idea is that we can use the primary key index to get all the RIDs
-        # then we can use these RIDs to find the records in the table. From here we can read the column needed
-        # and insert into the new tree along with RID. This is going to take time because we need to first get all the RIDs
-        # then we have to read from the table. THEN we insert into the new tree.
-        pass
+      # We are going to grab every thing that has been index, and use a query to get the latest version of the data
+      # Then we put this version into the new indexed column
+
+      # This needs to be done in here to prevent errors
+      from lstore.query import Query
+      query = Query(self.table)
+
+      if (self.indices[column_number]):
+        raise IndexError("An index for this column already exists")
+
+      # Create the new Btree
+      self.indices[column_number] = OOBTree()
+
+      # Grab all the rids in the primary key
+      for key in self.indices[self.key].keys():
+        records = query.select(key, self.key, [1] * self.table.num_columns)
+        for record in records:
+          # This includes the meta_data columns which is why it looks so weird
+          full_record = [record.indirection, record.rid, record.timestamp, record.schema_encoding]
+          full_record = full_record + record.columns
+          self.add(full_record)
 
     """
     # optional: Drop index of specific column
     """
 
     def drop_index(self, column_number):
-        # just use del self.indices[column_number], though we shouldn't be allowed to delete the primary key column
-        pass
+      del self.indices[column_number]
