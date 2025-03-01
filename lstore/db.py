@@ -1,7 +1,9 @@
+import json
 import pickle
 import os
 from lstore.bufferpool import BufferPool
 from lstore.table import Table
+from lstore.index import Index
 
 class Database():
 
@@ -13,16 +15,17 @@ class Database():
     def open(self, path):
         self.start_path = path
         self.bufferpool = BufferPool(self.start_path)
-        tables_path: str = self.start_path + "/tables/pickle.pkl"
-        if os.path.exists(tables_path):
-            with open(tables_path, 'rb') as file:
-                self.tables = pickle.load(file)
 
     def close(self):
         self.bufferpool.on_close()
         if self.start_path:
-            with open(self.start_path + "/tables/pickle.pkl", 'wb') as file:
-                pickle.dump(self.tables, file)
+            for table in self.tables.values():
+                with open(self.start_path + f"/tables/{table.name}/index.json", 'w') as file:
+                    json.dump(table.index.to_arr(), file)
+
+                table.index = None
+                with open(self.start_path + f"/tables/{table.name}/metadata.pkl", 'wb') as file:
+                    pickle.dump(table, file)
 
     """
     # Creates a new table
@@ -51,4 +54,12 @@ class Database():
     # Returns table with the passed name
     """
     def get_table(self, name):
-        return self.tables[name]
+        table_path = f"{self.start_path}/tables/{name}/"
+        if os.path.exists(table_path):
+            with open(f"{table_path}metadata.pkl", 'rb') as file:
+                table = pickle.load(file)
+                table.bufferpool = self.bufferpool
+                self.tables[name] = table
+                with open(f"{table_path}index.json", 'r') as file:
+                    table.index = Index.from_arr(table, json.load(file))
+                return table

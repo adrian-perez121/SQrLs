@@ -82,6 +82,30 @@ class Index:
         # By the end of the function we should have an array with all RIDs that were within the specified range.
         pass
 
+    def to_arr(self):
+      index_arr = []
+      for index in self.indices:
+        data = {}
+        if index:
+
+          for v, k in index.items():
+            data[v] = list(k)
+
+          index_arr.append(data)
+        else:
+          index_arr.append(None)
+
+      return index_arr
+
+    @classmethod
+    def from_arr(cls, table, index_arr):
+      index = Index(table)
+      for i, data in enumerate(index_arr):
+        if data:
+          index.indices[i] = OOBTree()
+          for k, v in data.items():
+            index.indices[i][int(k)] = set(v)
+      return index
     """
     # optional: Create index on specific column
     """
