@@ -21,6 +21,7 @@ class Index:
         # One index for each table. All our empty initially.
         self.indices: list = [None] * table.num_columns
         self.key = table.key
+        self.table = table
         self.indices[self.key] = OOBTree()
 
     def add(self, record):
