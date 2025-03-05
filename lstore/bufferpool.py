@@ -71,6 +71,7 @@ class BufferPool:
                 frame = frames[page_range_index]
                 
             frame.request_count += 1
+            self.last_accessed = time.time()
             return frame
         else:
             # TODO OOPS
@@ -90,6 +91,7 @@ class BufferPool:
         read_path = os.path.join(
             self.path, "tables", table_name, f"{page_range_index}.json"
         )
+        # self.evict_frame()
         if os.path.exists(read_path):
             try:
                 with open(read_path, "rb") as file:
@@ -124,7 +126,7 @@ class BufferPool:
             print("Somehow the write path didn't exist after making it.")
             pass
 
-    def get_least_needed_frame(self) -> Optional[Frame]:
+    def __oldget_least_needed_frame(self) -> Optional[Frame]:
         all_frames: list[Frame] = []
         for key in self.frames.keys:
             all_frames.extend(self.frames[key])
@@ -143,22 +145,40 @@ class BufferPool:
             sorted_frames[0:stop_index], key=Frame.last_accessed
         )  # Least requested pages sorted from oldest access to most recent access
         return sorted_frames[0] if sorted_frames else None
+    
+    def get_least_needed_frames_first(self) -> list[Frame]:
+        all_frames: list[Frame] = []
+        for key in self.frames.keys():
+            all_frames.extend(self.frames[key])
+            
+        sorted_frames = sorted(all_frames, key=lambda frame: (frame.pin, frame.last_accessed, frame.request_count))
+        stop_index = 0
+        least_requests = 0
+        for i, frame in enumerate(sorted_frames):
+            if i == 0:
+                least_requests = frame.request_count
+            if frame.request_count > least_requests:
+                stop_index = i
+                break
+        sorted_frames = sorted(
+            sorted_frames[0:stop_index], key=Frame.last_accessed
+        )  # Least requested pages sorted from oldest access to most recent access
+        return sorted_frames
 
     # Evict Frame aka a Page Range with the Frame Data
     def evict_frame(self):
         # If Frame Dirty, write to Disk
         if self.frames and not self.has_capacity():
-            frame = self.get_least_needed_frame()
-            if frame.is_dirty:
-                if frame.pin:  # M3: TODO might not work if pins is atomic
-                    # M3: Try to evict something else
-                    # TODO
-                    pass
-                else:
-                    if frame.table_name in self.frames:
+            frames = self.get_least_needed_frames_first()
+            if not frames:
+                raise Exception("No frames to evict.")
+            frame = frames[0]
+            if frame.is_dirty and not frame.pin:
+                if frame.table_name in self.frames:
                         self.write_frame(frame)
                         self.frames[frame.table_name][frame.position] = None
-        pass
+            else:
+                raise Exception("Failed to evict.")
 
     def on_close(self):
         for table_frames in self.frames.values():
