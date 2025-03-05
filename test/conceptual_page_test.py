@@ -1,5 +1,7 @@
 # To get the files from lstore
+import os
 import sys
+import shutil
 
 from lstore.conceptual_page import ConceptualPage
 import lstore.config as config
@@ -53,6 +55,48 @@ class MyTestCase(unittest.TestCase):
       self.assertEqual(i, test_page.read_metadata_at(i)[config.INDIRECTION_COLUMN])
       test_page.update_column(config.INDIRECTION_COLUMN ,i, i + 1)
       self.assertEqual(i + 1, test_page.read_metadata_at(i)[config.INDIRECTION_COLUMN])
+
+  def test_load_and_dump_files(self):
+    test_conceptual_page = ConceptualPage(2)
+
+    for i in range(0,4096, 5): # Step is to make the test faster
+
+      # six columns long because meta data columns
+      test_conceptual_page.write_record([i, i, i, i, i, i])
+      test_conceptual_page.dump_file("testpage")
+
+      loaded_page = ConceptualPage.load_file("testpage")
+
+      # Make sure the physical pages match
+      for i, column in enumerate(test_conceptual_page.pages):
+        for j, physical_page in enumerate(column):
+          self.assertEqual(physical_page.num_records, loaded_page.pages[i][j].num_records)
+          self.assertEqual(physical_page.data, loaded_page.pages[i][j].data)
+
+      self.assertEqual(test_conceptual_page.num_records, loaded_page.num_records)
+
+    os.remove("testpage.json") # clean up
+
+  def test_to_and_from_dict(self):
+    test_conceptual_page = ConceptualPage(2)
+
+    for i in range(0,4096, 10):
+
+      # six columns long because meta data columns
+      test_conceptual_page.write_record([i, i, i, i, i, i])
+      data = test_conceptual_page.to_dict()
+      new_page = ConceptualPage.from_dict(data)
+
+      # Make sure the physical pages match
+      for i, column in enumerate(test_conceptual_page.pages):
+        for j, physical_page in enumerate(column):
+          self.assertEqual(physical_page.num_records, new_page.pages[i][j].num_records)
+          self.assertEqual(physical_page.data, new_page.pages[i][j].data)
+
+        self.assertEqual(test_conceptual_page.num_records, new_page.num_records)
+
+
+
 
 
 

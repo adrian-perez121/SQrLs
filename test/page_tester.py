@@ -27,6 +27,15 @@ class MyTestCase(unittest.TestCase):
       test_page.read(513)
       test_page.read(10)
 
+  def test_to_and_from_dict(self):
+    test_page = Page()
+    for i in range(512):
+      test_page.write(i,i)
+      data = test_page.to_dict()
+      new_page = Page.from_dict(data)
+      self.assertEqual(test_page.num_records, new_page.num_records)
+      self.assertEqual(test_page.data, new_page.data)
+
 
 
 

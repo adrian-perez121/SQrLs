@@ -24,7 +24,7 @@ class Query:
       Creates the metadata part of the record. Timestamp isn't included in the arguments because it is grabbed when this
       method is run.
       """
-      record = [None] * 4
+      record = [0] * config.NUM_META_COLUMNS
 
       record[config.RID_COLUMN] = rid
       record[config.INDIRECTION_COLUMN] = indirection
@@ -32,6 +32,12 @@ class Query:
       record[config.SCHEMA_ENCODING_COLUMN] = schema
 
       return record
+
+    def __update_schema_encoding(self, current_schema_encoding, updated_columns):
+      for i, data in enumerate(updated_columns):
+        if data is not None:
+          current_schema_encoding[i] = 1
+      return current_schema_encoding
 
     """
     # internal Method
@@ -96,8 +102,10 @@ class Query:
       time = datetime.fromtimestamp(float(record_data[config.TIMESTAMP_COLUMN]))
       schema_encoding = self.__number_to_bit_array(record_data[config.SCHEMA_ENCODING_COLUMN], self.table.num_columns)
       # I'm sorry this is a little long
-      record = Record(record_data[config.INDIRECTION_COLUMN], record_data[config.RID_COLUMN], time, schema_encoding,
-                      search_key, record_data[4:])
+      record_data[config.TIMESTAMP_COLUMN] = time
+      record_data[config.SCHEMA_ENCODING_COLUMN] = schema_encoding
+
+      record = Record(record_data, search_key)
       return record
 
     def insert(self, *columns):
@@ -112,7 +120,7 @@ class Query:
         rid = self.table.new_rid()
         # TODO: Request Page logic (???) maybe link page range logic to bufferpool
         # bufferpool request range (self.table, index)
-        # print(f"Insert on Page Range {self.table.name}, {self.table.page_ranges_index}, {self.table.num_columns}")
+
         frame: Frame = self.bufferpool.get_frame(self.table.name, self.table.page_ranges_index, self.table.num_columns)
         frame.pin += 1
         page_range: PageRange = frame.page_range
@@ -133,8 +141,7 @@ class Query:
 
         frame.pin -= 1
 
-        # TODO: Question, why?
-        self.table.add_new_page_range()
+        self.table.add_new_page_range() # Page range is only added if needed
 
         return True
 
@@ -212,8 +219,7 @@ class Query:
               break
             current_rid = tail_record[config.INDIRECTION_COLUMN]
             page_range_index, tail_index, tail_slot = self.table.page_directory[current_rid]
-            tail_record = page_range.read_tail_record(tail_index, tail_slot,
-                                                                                    projected_columns_index)
+            tail_record = page_range.read_tail_record(tail_index, tail_slot, projected_columns_index)
             version_num -= 1
 
           frame.pin -= 1
@@ -225,7 +231,7 @@ class Query:
             for i, data in enumerate(self.__number_to_bit_array(tail_record[config.SCHEMA_ENCODING_COLUMN], self.table.num_columns)):
               # Only add in the updated data
               if data == 1:
-                base_record.columns[i] = tail_record[4 + i]
+                base_record.columns[i] = tail_record[config.NUM_META_COLUMNS + i]
 
           version_records.append(base_record)
 
@@ -265,16 +271,13 @@ class Query:
         page_range: PageRange = frame.page_range
 
         base_record = page_range.read_base_record(base_page_index, base_slot, [0] * self.table.num_columns)
+        record_data = None
+        schema_encoding_num = None
 
         if base_record[config.INDIRECTION_COLUMN] == 0:
           tail_rid = self.table.new_rid()
-          updated_schema_encoding = [0] * self.table.num_columns
-
-          # Set ones for the changed things
-          for i, data in enumerate(columns):
-            if data is not None:
-              updated_schema_encoding[i] = 1
-          schema_encoding_num = self.__bit_array_to_number(updated_schema_encoding)
+          schema_encoding_num = self.__update_schema_encoding([0] * self.table.num_columns, columns)
+          schema_encoding_num = self.__bit_array_to_number(schema_encoding_num)
 
           record_data = self.create_metadata(tail_rid, base_record[config.RID_COLUMN], schema_encoding_num)
           for data in columns:
@@ -282,11 +285,6 @@ class Query:
               record_data.append(data)
             else:
               record_data.append(0)
-
-          tail_index, tail_slot = page_range.write_tail_record(record_data)
-          self.table.page_directory[tail_rid] = (page_range_index, tail_index, tail_slot)
-          page_range.update_base_record_column(base_page_index, base_slot, config.INDIRECTION_COLUMN, tail_rid)
-          page_range.update_base_record_column(base_page_index, base_slot, config.SCHEMA_ENCODING_COLUMN, schema_encoding_num)
         else:
           # The base record has a tail record. This is the cumulative implementation.
           # v Contains all the columns that have been updated so far v
@@ -295,27 +293,25 @@ class Query:
           page_range_index, latest_tail_index, latest_tail_slot = self.table.page_directory[latest_tail_rid]
 
           latest_tail_record = page_range.read_tail_record(latest_tail_index, latest_tail_slot, base_record_updated_schema_encoding)
-          new_tail_rid = self.table.new_rid()
+          tail_rid = self.table.new_rid()
 
-          for i, data in enumerate(columns):
-            if data is not None: # Combining schema encodings
-              base_record_updated_schema_encoding[i] = 1
-          tail_schema_encoding_num = self.__bit_array_to_number(base_record_updated_schema_encoding)
+          schema_encoding_num = self.__update_schema_encoding(base_record_updated_schema_encoding, columns)
+          schema_encoding_num = self.__bit_array_to_number(base_record_updated_schema_encoding)
 
-          new_tail_record_data = self.create_metadata(new_tail_rid, latest_tail_rid, tail_schema_encoding_num)
+          record_data = self.create_metadata(tail_rid, latest_tail_rid, schema_encoding_num)
           for i, data in enumerate(columns):
             if data is not None:
-              new_tail_record_data.append(data)
-            elif latest_tail_record[i + 4]: # If there's data actually there
-              new_tail_record_data.append(latest_tail_record[i + 4]) # Offset for metadata columns
+              record_data.append(data)
+            elif latest_tail_record[i + config.NUM_META_COLUMNS]: # If there's data actually there
+              record_data.append(latest_tail_record[i + config.NUM_META_COLUMNS]) # Offset for metadata columns
             else:
-              new_tail_record_data.append(0)
+              record_data.append(0)
 
-          new_tail_index, new_tail_slot = page_range.write_tail_record(new_tail_record_data)
-          self.table.page_directory[new_tail_rid] = (page_range_index, new_tail_index, new_tail_slot)
-          page_range.update_base_record_column(base_page_index, base_slot, config.INDIRECTION_COLUMN, new_tail_rid)
-          page_range.update_base_record_column(base_page_index, base_slot, config.SCHEMA_ENCODING_COLUMN,
-                                               tail_schema_encoding_num)
+        tail_index, tail_slot = page_range.write_tail_record(record_data)
+        self.table.page_directory[tail_rid] = (page_range_index, tail_index, tail_slot)
+        page_range.update_base_record_column(base_page_index, base_slot, config.INDIRECTION_COLUMN, tail_rid)
+        page_range.update_base_record_column(base_page_index, base_slot, config.SCHEMA_ENCODING_COLUMN,
+                                             schema_encoding_num)
 
         frame.is_dirty = True
         frame.pin -= 1
@@ -324,15 +320,11 @@ class Query:
       new_records = self.select(primary_key, self.table.index.key, [1] * self.table.num_columns)
       # Remove the old records from the index and...
       for record in old_records:
-        full_record = [record.indirection, record.rid, record.timestamp, record.schema_encoding]
-        full_record = full_record + record.columns
-        self.table.index.delete(full_record)
+        self.table.index.delete(record.entire_record)
 
       # add in the new records
       for record in new_records:
-        full_record = [record.indirection, record.rid, record.timestamp, record.schema_encoding]
-        full_record = full_record + record.columns
-        self.table.index.add(full_record)
+        self.table.index.add(record.entire_record)
 
 
       return True

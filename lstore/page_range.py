@@ -5,7 +5,7 @@ from time import time
 class PageRange:
 
   def __init__(self, num_columns):
-    self.meta_data_columns = 4
+    self.meta_data_columns = config.NUM_META_COLUMNS
     self.regular_columns = num_columns
     self.total_columns = self.meta_data_columns + self.regular_columns
     self.base_pages = [ConceptualPage(num_columns)]

@@ -21,6 +21,7 @@ class Index:
         # One index for each table. All our empty initially.
         self.indices: list = [None] * table.num_columns
         self.key = table.key
+        self.table = table
         self.indices[self.key] = OOBTree()
 
     def add(self, record):
@@ -32,8 +33,8 @@ class Index:
         rid = record[config.RID_COLUMN]
 
         for i, column_index in enumerate(self.indices):
-            # We have to do i + 4 because the first 4 columns are metadata columns. In other words, I am aligning
-            key = record[i + 4]
+            # We have to do i + config.NUM_META_COLUMNS because the first config.NUM_META_COLUMNS columns are metadata columns. In other words, I am aligning
+            key = record[i + config.NUM_META_COLUMNS]
             if column_index != None:
                 # If we are going to allow duplicate values we should store RIDs in a set. RIDs are for certain unique
                 if key not in column_index:
@@ -50,7 +51,7 @@ class Index:
         rid = record[config.RID_COLUMN]
         for i, column_index in enumerate(self.indices):
             if column_index != None:
-                key = record[i + 4]
+                key = record[i + config.NUM_META_COLUMNS]
                 if key in column_index:
                     # Recall the tree keys are SETs with RIDs
                     column_index[key].remove(rid)
@@ -58,7 +59,7 @@ class Index:
                     if len(column_index[key]) == 0:
                         del column_index[key]
                 else:
-                    raise Exception("They key was in the index")
+                    raise Exception("The key was not in the index")
 
     """
     # returns the location of all records with the given value on column "column"
@@ -82,21 +83,60 @@ class Index:
         # By the end of the function we should have an array with all RIDs that were within the specified range.
         pass
 
+    def to_arr(self):
+      index_arr = []
+      for index in self.indices:
+        data = {}
+        if index:
+
+          for v, k in index.items():
+            data[v] = list(k)
+
+          index_arr.append(data)
+        else:
+          index_arr.append(None)
+
+      return index_arr
+
+    @classmethod
+    def from_arr(cls, table, index_arr):
+      index = Index(table)
+      for i, data in enumerate(index_arr):
+        if data:
+          index.indices[i] = OOBTree()
+          for k, v in data.items():
+            index.indices[i][int(k)] = set(v)
+      return index
     """
     # optional: Create index on specific column
     """
 
     def create_index(self, column_number):
-        # This function is going to take TIME. My idea is that we can use the primary key index to get all the RIDs
-        # then we can use these RIDs to find the records in the table. From here we can read the column needed
-        # and insert into the new tree along with RID. This is going to take time because we need to first get all the RIDs
-        # then we have to read from the table. THEN we insert into the new tree.
-        pass
+      # We are going to grab every thing that has been index, and use a query to get the latest version of the data
+      # Then we put this version into the new indexed column
+
+      # This needs to be done in here to prevent errors
+      from lstore.query import Query
+      query = Query(self.table)
+
+      if (self.indices[column_number]):
+        raise IndexError("An index for this column already exists")
+
+      # Create the new Btree
+      self.indices[column_number] = OOBTree()
+
+      # Grab all the rids in the primary key
+      for key in self.indices[self.key].keys():
+        records = query.select(key, self.key, [1] * self.table.num_columns)
+        for record in records:
+          # This includes the meta_data columns which is why it looks so weird
+          full_record = [record.indirection, record.rid, record.timestamp, record.schema_encoding]
+          full_record = full_record + record.columns
+          self.add(full_record)
 
     """
     # optional: Drop index of specific column
     """
 
     def drop_index(self, column_number):
-        # just use del self.indices[column_number], though we shouldn't be allowed to delete the primary key column
-        pass
+      del self.indices[column_number]
