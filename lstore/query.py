@@ -62,23 +62,6 @@ class Query:
 
           base_record = page_range.read_base_record(base_page_index, base_slot, [1] * self.table.num_columns)
 
-
-          base_rid = rid
-          page_range.update_base_record_column(base_page_index, base_slot, config.RID_COLUMN, 0)
-
-          current_rid = base_record[config.INDIRECTION_COLUMN]
-          while current_rid and current_rid != base_rid:
-            # We know we don't have to get a new frame because any update to a base record in a page range goes to a
-            # tail record in the same page range
-            page_range_index, tail_index, tail_slot = self.table.page_directory[current_rid]
-
-            tail_record = page_range.read_tail_record(tail_index, tail_slot,
-                                                                                   [0] * self.table.num_columns)
-
-            page_range.update_tail_record_column(tail_index, tail_slot, config.RID_COLUMN,
-                                                                              0)
-            current_rid = tail_record[config.INDIRECTION_COLUMN]
-
           self.table.index.delete(base_record)
           frame.is_dirty = True
           frame.pin -= 1
