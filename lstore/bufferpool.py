@@ -110,19 +110,18 @@ class BufferPool:
             )
 
     def write_frame(self, frame: Frame):
-        # TODO Look into possible issues with this way of writing
-        write_path = os.path.join(self.path, "tables", frame.table_name)
-        os.makedirs(write_path, exist_ok=True)
-        if os.path.exists(write_path):
-            frame_path = os.path.join(write_path, f"{frame.position}.json")
-            if os.path.exists(frame_path):
-                # print("Overwrite Log")
-                pass
+        folder_path = os.path.join(self.path, "tables", frame.table_name)
+        os.makedirs(folder_path, exist_ok=True)
+        if os.path.exists(folder_path):
+            frame_path = os.path.join(folder_path, f"{frame.position}.json")
+            # if os.path.exists(frame_path):
+            #     # print("Overwrite Log")
+            #     pass
             try:
-                with open(frame_path, "w", encoding="utf-8") as file:
+                with open(frame_path, "w+", encoding="utf-8") as file:
                     json.dump(frame.page_range.to_dict(), file)
                 # call function to save contents
-                frame.page_range.save_contents(path=frame_path)
+                frame.page_range.save_contents(path=folder_path)
             except Exception as e:
                 print(f"Exception raised while writing frame to disk: {e}")
         else:

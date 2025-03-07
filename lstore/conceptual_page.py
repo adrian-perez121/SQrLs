@@ -115,12 +115,13 @@ class ConceptualPage:
     data["num_records"] = self.num_records
     # }
 
-    for i, column in enumerate(self.pages):
-      data[str(i)] = {}
+    # metadata only, so ignore the next part
+    
+    # for i, column in enumerate(self.pages):
+    #   data[str(i)] = {}
 
-      for j, physical_page in enumerate(column):
-        # metadata only
-        data[str(i)][str(j)] = physical_page.to_dict()
+    #   for j, physical_page in enumerate(column):
+    #     data[str(i)][str(j)] = physical_page.to_dict()
     return data
 
   @classmethod

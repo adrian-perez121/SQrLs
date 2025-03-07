@@ -40,8 +40,6 @@ class Page:
     data = {}
     data["num_records"] = self.num_records
 
-    # need to write metadata and actual data to disk here
-
     # removed actual data, this only holds metadata now
     # data["byte_array"] = base64.b64encode(self.data).decode('utf-8')
     return data

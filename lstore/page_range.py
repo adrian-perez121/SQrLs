@@ -139,35 +139,49 @@ class PageRange:
   # (repeat for all tp in pr)
   def save_contents(self, path):
 
-    # save page_range metadata
-    # something like self.to_json()
-
-
-    for i in len(self.base_pages):
+    # save base pages
+    for i in range(len(self.base_pages)):
       # create json of metadata
       # save metadata json
+      with open(f"{path}/b{i}.json", "w+", encoding="utf-8") as file:
+        json.dump(self.base_pages[i].to_dict(), file)
       # path = f"{path}/b{i}/"
       # path = f"{path}/b{i}.json"
-      for j in self.base_pages[i].pages:
+      
+      # save phys pages inside base page
+      for j in range(len(self.base_pages[i].pages)):
         # create json of column metadata
         # save metadata to json
+        with open(f"{path}/b{i}/col{j}.json", "w+", encoding="utf-8") as file:
+          json.dump(self.base_pages[i].pages[j].to_dict(), file)
         # path = f"{path}/b{i}/col{j}.bin"
         # path = f"{path}/b{i}/col{j}.json"
+
         # write binary data to path
-        pass
+        with open(f"{path}/b{i}/col{j}.bin", 'wb+') as data_file:
+          data_file.write(self.base_pages[i].pages[j].data)
         
-    for i in len(self.tail_pages):
+    # save tail pages
+    for i in range(len(self.tail_pages)):
       # create json of metadata
       # save metadata json
+      with open(f"{path}/t{i}.json", "w+", encoding="utf-8") as file:
+        json.dump(self.tail_pages[i].to_dict(), file)
       # path = f"{path}/t{i}/"
       # path = f"{path}/t{i}.json"
-      for j in self.tail_pages[i].pages:
+      
+      # save phys pages inside tail page
+      for j in range(len(self.tail_pages[i].pages)):
         # create json of column metadata
         # save metadata to json
+        with open(f"{path}/t{i}/col{j}.json", "w+", encoding="utf-8") as file:
+          json.dump(self.tail_pages[i].pages[j].to_dict(), file)
         # path = f"{path}/t{i}/col{j}.bin"
         # path = f"{path}/t{i}/col{j}.json"
+        
         # write binary data to path
-        pass
+        with open(f"{path}/t{i}/col{j}.bin", 'wb+') as data_file:
+          data_file.write(self.tail_pages[i].pages[j].data)
 
   def open_conceptual_pages(self, path):
     base_pairs = []
