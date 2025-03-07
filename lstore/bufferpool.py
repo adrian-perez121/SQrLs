@@ -88,17 +88,18 @@ class BufferPool:
 
     def read_frame(self, table_name: str, page_range_index: int, num_columns: int):
         # TODO Look into possible issues with this way of reading
-        read_path = os.path.join(
-            self.path, "tables", table_name, f"{page_range_index}.json"
+        dir_path = os.path.join(
+            self.path, "tables", table_name, f"{page_range_index}"
         )
+        json_path = dir_path + ".json"
         # self.evict_frame()
-        if os.path.exists(read_path):
+        if os.path.exists(json_path):
             try:
-                with open(read_path, "rb") as file:
+                with open(json_path, "rb") as file:
                     self.frames[table_name][page_range_index] = Frame(
                         table_name,
                         page_range_index,
-                        PageRange.from_dict(json.load(file)),
+                        PageRange.from_dict(json.load(file), dir_path),
                         from_disk=True,
                     )
             except Exception as e:
@@ -120,6 +121,8 @@ class BufferPool:
             try:
                 with open(frame_path, "w", encoding="utf-8") as file:
                     json.dump(frame.page_range.to_dict(), file)
+                # call function to save contents
+                frame.page_range.save_contents(path=frame_path)
             except Exception as e:
                 print(f"Exception raised while writing frame to disk: {e}")
         else:

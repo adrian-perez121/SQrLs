@@ -1,5 +1,5 @@
 from lstore.page import Page  # Assuming your Page class is defined in page.py
-import json
+import os, json
 from lstore.config import NUM_META_COLUMNS
 
 class ConceptualPage:
@@ -119,23 +119,27 @@ class ConceptualPage:
       data[str(i)] = {}
 
       for j, physical_page in enumerate(column):
+        # metadata only
         data[str(i)][str(j)] = physical_page.to_dict()
     return data
 
   @classmethod
-  def from_dict(cls, data):
+  def from_dict(cls, data, path):
     new_conceptual_page = cls(data["regular_columns"])
     new_conceptual_page.metadata_columns = data["metadata_columns"]
     new_conceptual_page.num_records = data["num_records"]
 
-    pages = []
-    for column in range(new_conceptual_page.total_columns):
-      pages.append([])
-      for page in data[str(column)]:
-        pages[column].append(Page.from_dict(data[str(column)][str(page)]))
+    # call function to get phys pages
+    new_conceptual_page.open_phys_pages(path)
 
+    # old version:
+    # pages = []
+    # for column in range(new_conceptual_page.total_columns):
+    #   pages.append([])
+    #   for page in data[str(column)]:
+    #     pages[column].append(Page.from_dict(data[str(column)][str(page)]))
+    # new_conceptual_page.pages = pages
 
-    new_conceptual_page.pages = pages
     return new_conceptual_page
 
   def dump_file(self, name):
@@ -165,3 +169,36 @@ class ConceptualPage:
 
     new_conceptual_page.pages = pages
     return new_conceptual_page
+  
+
+  def open_phys_pages(self, path):
+  # use os to see all phys page in dir
+    page_pairs = []
+    for dir in os.listdir(path):
+        if dir.startswith("col") and dir[3:].isdigit():  # Check if column file
+            bin_path = os.path.join(path, f"col{dir}.bin")
+            json_path = os.path.join(path, f"col{dir}.json")
+
+            if os.path.isfile(bin_path) and os.path.isfile(json_path):
+                page_pairs.append((bin_path, json_path))
+
+            # order pairs numerically
+            page_pairs.sort(key=lambda x: int(os.path.basename(x[0])))
+
+            # iterate through the pairs
+            self.pages = [Page.from_dict(json.load(path_json), path_bin) for path_bin, path_json in page_pairs]
+
+
+
+            # for path_folder, path_json in page_pairs:
+            #     # inside each page range, read the metadata
+            #     with open(path_json, "r") as page_metadata:
+            #         data = json.load(page_metadata)
+
+            #     # get data from json
+            #     num_records = data["num_records"]
+
+            #     # use the data to create a page range object
+            #     new_page = Page(num_records=num_records)
+            #     # add page to page group
+            #     page_group.append(new_page)
