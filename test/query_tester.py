@@ -7,6 +7,7 @@ from selectors import KqueueSelector
 from lstore.table import Table
 import lstore.config as config
 from lstore.query import Query
+from lstore.bufferpool import BufferPool
 
 sys.path.append('../lstore')
 import unittest
@@ -16,7 +17,8 @@ class MyTestCase(unittest.TestCase):
     # A rigorous testing of add.
     # Checks if the index was updated correctly
     # Checks if the page directory was update correctly
-    table = Table("test", 3, 0)
+    bp = BufferPool("testbp")
+    table = Table("test", 3, 0, bp)
     query = Query(table)
     page_directory = table.page_directory
     index = table.index
@@ -44,7 +46,8 @@ class MyTestCase(unittest.TestCase):
       rid += 1
 
   def test_insert_select_duplicate(self):
-    table = Table("test", 3, 0)
+    bp = BufferPool("testbp")
+    table = Table("test", 3, 0, bp)
     query = Query(table)
     page_directory = table.page_directory
     records_data = [[1, 2, 5], [1, 20, 50], [1, 200, 500]]
@@ -56,8 +59,9 @@ class MyTestCase(unittest.TestCase):
       self.assertEqual(records_data[i], record.columns)
 
   def test_select_version_with_no_updates(self):
+    bp = BufferPool("testbp")
     # Testing how the method works when we only have one version of a record
-    table = Table("test", 3, 0)
+    table = Table("test", 3, 0, bp)
     query = Query(table)
     used_pks = set()
     for i in range(5):
@@ -71,7 +75,8 @@ class MyTestCase(unittest.TestCase):
       self.assertEqual(record_data, record.columns)
 
   def test_update(self):
-    table = Table("test", 3, 0)
+    bp = BufferPool("testbp")
+    table = Table("test", 3, 0, bp)
     query = Query(table)
     used_pks = set()
     rid = 1
@@ -91,7 +96,8 @@ class MyTestCase(unittest.TestCase):
       rid += 1
 
   def test_update_same_record(self):
-    table = Table("test", 4, 0)
+    bp = BufferPool("testbp")
+    table = Table("test", 4, 0, bp)
     query = Query(table)
     query.insert(*[1,2,3,4])
 
@@ -120,6 +126,31 @@ class MyTestCase(unittest.TestCase):
 
     record = query.select_version(1, 0, [1, 1, 1, 1], -10)[0]
     self.assertEqual(record.columns, [1, 2, 3, 4])
+
+  def test_undo_methods(self):
+    bp = BufferPool("testbp")
+    table = Table("test", 3, 0, bp)
+    query = Query(table)
+    page_directory = table.page_directory
+    index = table.index
+    # We know the RID of the base record is going to be one
+    query.insert(1,1,1)
+    query.update(1, *[1,2,2])
+    query.update(1, *[1,3,3])
+
+    query.delete(1)
+    self.assertTrue(len(query.select(1, 0 , [1,1,1])) == 0)
+    query.undo_delete(1)
+
+    query.undo_latest_update(1)
+    self.assertEqual(query.select(1,0, [1,1,1])[0].columns, [1, 2, 2])
+    query.undo_latest_update(1)
+    self.assertEqual(query.select(1, 0, [1, 1, 1])[0].columns, [1, 1, 1])
+
+    query.undo_insert(1,1,True)
+    self.assertTrue(len(query.select(1, 0 , [1,1,1])) == 0)
+
+
 
 
 

@@ -1,4 +1,5 @@
 import time
+from binascii import b2a_hex
 
 from lstore.bufferpool import BufferPool, Frame
 from lstore.page_range import PageRange
@@ -63,28 +64,35 @@ class Query:
           base_record = page_range.read_base_record(base_page_index, base_slot, [1] * self.table.num_columns)
 
 
-          base_rid = rid
           page_range.update_base_record_column(base_page_index, base_slot, config.RID_COLUMN, 0)
 
-          current_rid = base_record[config.INDIRECTION_COLUMN]
-          while current_rid and current_rid != base_rid:
-            # We know we don't have to get a new frame because any update to a base record in a page range goes to a
-            # tail record in the same page range
-            page_range_index, tail_index, tail_slot = self.table.page_directory[current_rid]
-
-            tail_record = page_range.read_tail_record(tail_index, tail_slot,
-                                                                                   [0] * self.table.num_columns)
-
-            page_range.update_tail_record_column(tail_index, tail_slot, config.RID_COLUMN,
-                                                                              0)
-            current_rid = tail_record[config.INDIRECTION_COLUMN]
 
           self.table.index.delete(base_record)
           frame.is_dirty = True
           frame.pin -= 1
-          self.table.page_directory[rid] = None
+          # self.table.page_directory[rid] = None
 
         return True
+
+    def undo_delete(self, base_rid):
+        page_range_index, base_page_index, base_slot = self.table.page_directory[base_rid]
+
+        frame: Frame = self.bufferpool.get_frame(self.table.name, page_range_index,
+                                                 self.table.num_columns)
+        frame.pin += 1
+        page_range: PageRange = frame.page_range
+
+        base_record = page_range.read_base_record(base_page_index, base_slot, [1] * self.table.num_columns)
+        base_record[config.RID_COLUMN] = base_rid
+
+        page_range.update_base_record_column(base_page_index, base_slot, config.RID_COLUMN, base_rid)
+
+        self.table.index.add(base_record)
+        frame.is_dirty = True
+        frame.pin -= 1
+
+        return
+
 
 
     """
@@ -241,7 +249,50 @@ class Query:
       return version_records
 
 
+    def undo_latest_update(self, base_rid):
+      # Note: This should only run when the base_record has an update
+      page_range_index, bp_index, bp_slot =  self.table.page_directory[base_rid]
 
+      frame: Frame = self.bufferpool.get_frame(self.table.name, page_range_index,
+                                               self.table.num_columns)
+      frame.pin += 1
+      page_range: PageRange = frame.page_range
+
+      base_record = page_range.read_base_record(bp_index, bp_slot, [1] * self.table.num_columns)
+      latest_tail_rid = base_record[config.INDIRECTION_COLUMN]
+      page_range_index, tp_index, tp_slot = self.table.page_directory[latest_tail_rid]
+      latest_tail_record = page_range.read_tail_record(tp_index, tp_slot, [1] * self.table.num_columns)
+
+      latest_version = base_record
+
+      for i, data in enumerate(
+        self.__number_to_bit_array(latest_tail_record[config.SCHEMA_ENCODING_COLUMN], self.table.num_columns)):
+        # Only add in the updated data
+        if data == 1:
+          latest_version[config.NUM_META_COLUMNS + i] = latest_tail_record[config.NUM_META_COLUMNS + i]
+
+      self.table.index.delete(latest_version) # Maintaining the index
+
+      behind_latest_rid = latest_tail_record[config.INDIRECTION_COLUMN]
+
+      if behind_latest_rid == base_rid: # This will change the indirection for the base_record back to 0
+        behind_latest_rid = 0
+        self.table.index.add(base_record) # Maintaining the index
+      else:
+        page_range_index, new_latest_tail, new_latest_slot = self.table.page_directory[behind_latest_rid]
+        new_latest_tail = page_range.read_tail_record(new_latest_tail, new_latest_slot, [1] * self.table.num_columns)
+        updated_record = base_record
+        for i, data in enumerate(
+          self.__number_to_bit_array(new_latest_tail[config.SCHEMA_ENCODING_COLUMN], self.table.num_columns)):
+          # Only add in the updated data
+          if data == 1:
+            updated_record[config.NUM_META_COLUMNS + i] = new_latest_tail[config.NUM_META_COLUMNS + i]
+        self.table.index.add(updated_record) # Maintaining the index
+
+      # Pretty much skipping over the last update
+      page_range.update_base_record_column(bp_index, bp_slot, config.INDIRECTION_COLUMN, behind_latest_rid)
+
+      return
     """
     # Update a record with specified key and columns
     # Returns True if update is succesful
@@ -382,6 +433,35 @@ class Query:
         return False
 
       return total_sum
+
+    def undo_insert(self, rid, primary_key, isBaseRecord=bool):
+      page_range_index, page_index, page_slot = self.table.page_directory[rid]
+      frame: Frame = self.bufferpool.get_frame(self.table.name, page_range_index, self.table.num_columns)
+      frame.pin += 1
+      page_range: PageRange = frame.page_range
+
+      old_records = None
+      if isBaseRecord:
+        base_record = page_range.read_base_record(page_index, page_slot, [1] * self.table.num_columns)
+        page_range.update_base_record_column(page_index, page_slot, config.RID_COLUMN, 0)
+        self.table.index.delete(base_record)
+      else:
+        old_records = self.select(primary_key, self.table.index.key, [1] * self.table.num_columns)
+        page_range.update_tail_record_column(page_index, page_slot, config.RID_COLUMN, 0)
+
+      frame.is_dirty = True
+      frame.pin -= 1
+      del self.table.page_directory[rid]
+
+      if not isBaseRecord:
+        new_records = self.select(primary_key, self.table.index.key, [1] * self.table.num_columns)
+        # Remove the old records from the index and...
+        for record in old_records:
+          self.table.index.delete(record.entire_record)
+
+        # add in the new records
+        for record in new_records:
+          self.table.index.add(record.entire_record)
 
 
     """
