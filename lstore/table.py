@@ -4,6 +4,7 @@ from lstore.page_range import PageRange
 from time import time
 import threading
 from lstore.page_range import PageRange
+from lstore.lock_manage import LockManage
 
 # 4 Meta Data Columns {
 INDIRECTION_COLUMN = 0
@@ -27,9 +28,10 @@ class Table:
         self.page_directory = {}
         self.index: Index = Index(self)
         self.rid = 1
-
         self.bufferpool: BufferPool = bufferpool
-        pass
+        
+        # init lock manage
+        self.lock_manage = LockManage()
 
     def new_rid(self):
       tmp = self.rid

@@ -20,12 +20,27 @@ class Database():
         self.bufferpool.on_close()
         if self.start_path:
             for table in self.tables.values():
+                # save index as json
                 with open(self.start_path + f"/tables/{table.name}/index.json", 'w') as file:
                     json.dump(table.index.to_arr(), file)
 
-                table.index = None
+                # create clean copy
+                table_copy = Table(table.name, table.num_columns, table.key, None)
+                table_copy.index = None  # prevent json issues
+                table_copy.bufferpool = None  # prevent pickling errors
+                table_copy.page_directory = table.page_directory  # keep page mappings
+
+                # remove problematic lock attributes
+                if hasattr(table_copy, "lock_manage"):
+                    table_copy.lock_manage = None  # removes _thread.lock
+                if hasattr(table_copy, "some_other_lock"):  # safety
+                    table_copy.some_other_lock = None
+
+                # pickle the clean table
                 with open(self.start_path + f"/tables/{table.name}/metadata.pkl", 'wb') as file:
-                    pickle.dump(table, file)
+                    pickle.dump(table_copy, file)
+
+
 
     """
     # Creates a new table

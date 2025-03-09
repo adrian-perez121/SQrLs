@@ -19,28 +19,23 @@ A data strucutre holding indices for various columns of a table. Key column shou
 class Index:
     def __init__(self, table):
         # One index for each table. All our empty initially.
-        self.indices: list = [None] * table.num_columns
+        self.indices = {i: OOBTree() for i in range(table.num_columns)}  # use oobtree for all columns
         self.key = table.key
         self.table = table
         self.indices[self.key] = OOBTree()
 
     def add(self, record):
-        """
-        A method for adding something to the index. This method would most likely be used during the
-        insert query. From the record the RID can be extracted and then for the columns that contain
-        indexes, the data from that column can also be added into the Btree.
-        """
         rid = record[config.RID_COLUMN]
 
         for i, column_index in enumerate(self.indices):
-            # We have to do i + config.NUM_META_COLUMNS because the first config.NUM_META_COLUMNS columns are metadata columns. In other words, I am aligning
+            if self.indices[i] is None:
+                self.indices[i] = OOBTree()  # init tree if missing
+
             key = record[i + config.NUM_META_COLUMNS]
-            if column_index != None:
-                # If we are going to allow duplicate values we should store RIDs in a set. RIDs are for certain unique
-                if key not in column_index:
-                    column_index[key] = set()
-                # All nodes should contain sets
-                column_index[key].add(rid)
+            if key not in self.indices[i]:
+                self.indices[i][key] = set()  # store the set of RIDs
+
+            self.indices[i][key].add(rid)
 
     def delete(self, record):
         """
@@ -85,17 +80,14 @@ class Index:
 
     def to_arr(self):
       index_arr = []
-      for index in self.indices:
-        data = {}
-        if index:
-
-          for v, k in index.items():
-            data[v] = list(k)
-
-          index_arr.append(data)
-        else:
-          index_arr.append(None)
-
+      for index in self.indices.values():  # iterate over actual index objects
+          data = {}
+          if isinstance(index, OOBTree):  # ensure oobtree before .items()
+              for v, k in index.items():
+                  data[v] = list(k)
+              index_arr.append(data)
+          else:
+              index_arr.append(None)  # treat as empty index if not oobtree
       return index_arr
 
     @classmethod

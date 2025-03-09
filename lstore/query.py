@@ -7,6 +7,9 @@ from lstore.table import Table
 from lstore.record import Record
 import lstore.config as config
 from datetime import datetime
+from lstore.lock_manage import LockManage
+from BTrees.OOBTree import OOBTree
+
 
 class Query:
     """
@@ -17,8 +20,8 @@ class Query:
     """
     def __init__(self, table: Table):
         self.table: Table = table
+        self.lock_manage = table.lock_manage  # use table's lock_manage
         self.bufferpool: BufferPool = table.bufferpool
-        pass
 
     def create_metadata(self, rid, indirection = 0, schema = 0):
       """
@@ -47,32 +50,50 @@ class Query:
     # Return False if record doesn't exist or is locked due to 2PL
     """
     def delete(self, primary_key):
-        # After your all done, remove the primary key from the primary key index
-        rids = self.table.index.locate(self.table.key, primary_key).copy()
-
+        """ Deletes a record, acquiring an exclusive lock. """
+        
+        # locate all RIDs for the primary key
+        rids = self.table.index.locate(self.table.key, primary_key)
+        
         if not rids:
-          return False
-
+            return False
+        
         for rid in rids:
-          page_range_index, base_page_index, base_slot = self.table.page_directory[rid]
+            # acquire exclusive lock for delete
+            if not self.lock_manage.acquire_record_lock(rid, id(self), "E"):
+                raise Exception(f"Transaction {id(self)} failed to acquire lock for DELETE {rid}")
 
-          frame: Frame = self.bufferpool.get_frame(self.table.name, page_range_index,
-                                                   self.table.num_columns)
-          frame.pin += 1
-          page_range: PageRange = frame.page_range
+        try:
+            for rid in rids:
+                page_range_index, base_page_index, base_slot = self.table.page_directory[rid]
 
-          base_record = page_range.read_base_record(base_page_index, base_slot, [1] * self.table.num_columns)
+                frame: Frame = self.bufferpool.get_frame(self.table.name, page_range_index, self.table.num_columns)
+                frame.pin += 1
+                page_range: PageRange = frame.page_range
 
+                # read base record for reference
+                base_record = page_range.read_base_record(base_page_index, base_slot, [1] * self.table.num_columns)
 
-          page_range.update_base_record_column(base_page_index, base_slot, config.RID_COLUMN, 0)
+                # set RID to 0 to indicate deletion
+                page_range.update_base_record_column(base_page_index, base_slot, config.RID_COLUMN, 0)
 
+                # remove from ndex
+                self.table.index.delete(base_record)
 
-          self.table.index.delete(base_record)
-          frame.is_dirty = True
-          frame.pin -= 1
-          # self.table.page_directory[rid] = None
+                frame.is_dirty = True
+                frame.pin -= 1
 
-        return True
+                # remove from page directory
+                del self.table.page_directory[rid]
+
+            return True
+
+        except Exception as e:
+            print(f"Delete failed: {e}")
+            for rid in rids:
+                self.lock_manage.release_record_lock(rid, id(self))  # release
+            return False
+
 
     def undo_delete(self, base_rid):
         page_range_index, base_page_index, base_slot = self.table.page_directory[base_rid]
@@ -117,41 +138,53 @@ class Query:
       return record
 
     def insert(self, *columns):
-        if len(columns) != self.table.num_columns:
+      if len(columns) != self.table.num_columns:
+          print(f"Insert failed: column length mismatch ({len(columns)} != {self.table.num_columns})")
           return False
 
-        pk_column = self.table.index.key
+      pk_column = self.table.index.key
+      existing_keys = self.table.index.indices.get(pk_column, {})
 
-        if columns[pk_column] in self.table.index.indices[pk_column]:
+      if not isinstance(existing_keys, (dict, OOBTree)):
+          existing_keys = OOBTree()
+
+      if columns[pk_column] in existing_keys:
+          print(f"Insert failed: Duplicate primary key {columns[pk_column]}")
+          return False  # prevents multiple primary key insertions
+      
+      rid = columns[self.table.index.key]  # use primary key as RID
+
+      # lock for E insert
+      if not self.lock_manage.acquire_record_lock(rid, id(self), "E"):
+          print(f"Insert failed: Could not acquire lock for RID {rid}")
+          return False
+      
+      try:
+          frame: Frame = self.bufferpool.get_frame(self.table.name, self.table.page_ranges_index, self.table.num_columns)
+          frame.pin += 1
+          page_range: PageRange = frame.page_range
+
+          new_record = [0] * config.NUM_META_COLUMNS + list(columns)
+          index, slot = page_range.write_base_record(new_record)
+
+          self.table.page_directory[rid] = (self.table.page_ranges_index, index, slot)
+          print(f"Inserted: RID={rid}, page_range={self.table.page_ranges_index}, index={index}, slot={slot}")
+
+          if not isinstance(self.table.index.indices.get(pk_column), OOBTree):
+              self.table.index.indices[pk_column] = OOBTree()
+
+          self.table.index.add(new_record)
+
+          frame.is_dirty = True
+          frame.pin -= 1
+          self.table.add_new_page_range()
+          return True
+      
+      except Exception as e:
+          print(f"Insert failed: {e}")
+          self.lock_manage.release_record_lock(rid, id(self))  # release lock
           return False
 
-        rid = self.table.new_rid()
-        # TODO: Request Page logic (???) maybe link page range logic to bufferpool
-        # bufferpool request range (self.table, index)
-
-        frame: Frame = self.bufferpool.get_frame(self.table.name, self.table.page_ranges_index, self.table.num_columns)
-        frame.pin += 1
-        page_range: PageRange = frame.page_range
-
-        frame.is_dirty = True
-        # TODO: Decrement Pin Count
-
-        # Create an array with the metadata columns, and then add in the regular data columns
-        new_record = self.create_metadata(rid)
-        for data in columns:
-          new_record.append(data)
-        # - write this record into the table
-        index, slot = page_range.write_base_record(new_record)
-        # - add the RID and location into the page directory
-        self.table.page_directory[rid] = (self.table.page_ranges_index, index, slot)
-        self.table.index.add(new_record)
-      # - add the record in the index
-
-        frame.pin -= 1
-
-        self.table.add_new_page_range() # Page range is only added if needed
-
-        return True
 
     """
     # Read matching record with specified search key
@@ -162,9 +195,26 @@ class Query:
     # Returns False if record locked by TPL
     # Assume that select will never be called on a key that doesn't exist # This is nice to know
     """
-    def select(self, search_key, search_key_index, projected_columns_index):
-      # Select wants the latest version so this is select version 0
-      return self.select_version(search_key, search_key_index, projected_columns_index, 0)
+    def select(self, rid, search_key_index, projected_columns_index):
+      if rid not in self.table.page_directory:
+          print(f"Select failed: RID: {rid} not found in the page_directory. Available RIDs: {list(self.table.page_directory.keys())}")
+          return []
+
+      page_range_index, base_page_index, slot = self.table.page_directory[rid]
+
+      frame: Frame = self.bufferpool.get_frame(self.table.name, page_range_index, self.table.num_columns)
+      frame.pin += 1
+      page_range: PageRange = frame.page_range
+
+      record_data = page_range.read_base_record(base_page_index, slot, projected_columns_index)
+      frame.pin -= 1
+
+      if not record_data:
+          print(f"Select failed: No data found for this RID: {rid}")
+          return []
+
+      return [self.__build_record(record_data, rid)]
+
 
     def __select_base_records(self, search_key, search_key_index, projected_columns_index):
       records = []
@@ -310,75 +360,67 @@ class Query:
       # be done after we are done updating
       old_records = self.select(primary_key, self.table.index.key, [1] * self.table.num_columns)
 
-      if rids is None:
+      if not rids:
         return False
 
-      for rid in rids:
-        page_range_index, base_page_index, base_slot = self.table.page_directory[rid]
+      try:
+        # track old records for index update
+        old_records = self.select(primary_key, self.table.index.key, [1] * self.table.num_columns)
 
-        frame: Frame = self.bufferpool.get_frame(self.table.name, page_range_index,
-                                                 self.table.num_columns)
-        frame.pin += 1
-        page_range: PageRange = frame.page_range
+        for rid in rids:
+            page_range_index, base_page_index, base_slot = self.table.page_directory[rid]
 
-        base_record = page_range.read_base_record(base_page_index, base_slot, [0] * self.table.num_columns)
-        record_data = None
-        schema_encoding_num = None
+            frame: Frame = self.bufferpool.get_frame(self.table.name, page_range_index, self.table.num_columns)
+            frame.pin += 1
+            page_range: PageRange = frame.page_range
 
-        if base_record[config.INDIRECTION_COLUMN] == 0:
-          tail_rid = self.table.new_rid()
-          schema_encoding_num = self.__update_schema_encoding([0] * self.table.num_columns, columns)
-          schema_encoding_num = self.__bit_array_to_number(schema_encoding_num)
+            # read base record
+            base_record = page_range.read_base_record(base_page_index, base_slot, [0] * self.table.num_columns)
 
-          record_data = self.create_metadata(tail_rid, base_record[config.RID_COLUMN], schema_encoding_num)
-          for data in columns:
-            if data is not None:
-              record_data.append(data)
-            else:
-              record_data.append(0)
-        else:
-          # The base record has a tail record. This is the cumulative implementation.
-          # v Contains all the columns that have been updated so far v
-          base_record_updated_schema_encoding = self.__number_to_bit_array(base_record[config.SCHEMA_ENCODING_COLUMN], self.table.num_columns)
-          latest_tail_rid = base_record[config.INDIRECTION_COLUMN]
-          page_range_index, latest_tail_index, latest_tail_slot = self.table.page_directory[latest_tail_rid]
+            # if first update or an additional update
+            tail_rid = self.table.new_rid()
+            prev_rid = base_record[config.INDIRECTION_COLUMN] or rid
 
-          latest_tail_record = page_range.read_tail_record(latest_tail_index, latest_tail_slot, base_record_updated_schema_encoding)
-          tail_rid = self.table.new_rid()
+            # schema
+            schema_encoding = self.__update_schema_encoding([0] * self.table.num_columns, columns)
+            schema_encoding_num = self.__bit_array_to_number(schema_encoding)
 
-          schema_encoding_num = self.__update_schema_encoding(base_record_updated_schema_encoding, columns)
-          schema_encoding_num = self.__bit_array_to_number(base_record_updated_schema_encoding)
+            # new tail record
+            tail_record = self.create_metadata(tail_rid, prev_rid, schema_encoding_num)
 
-          record_data = self.create_metadata(tail_rid, latest_tail_rid, schema_encoding_num)
-          for i, data in enumerate(columns):
-            if data is not None:
-              record_data.append(data)
-            elif latest_tail_record[i + config.NUM_META_COLUMNS]: # If there's data actually there
-              record_data.append(latest_tail_record[i + config.NUM_META_COLUMNS]) # Offset for metadata columns
-            else:
-              record_data.append(0)
+            # potential fix to ensure the values are copied right
+            for i, data in enumerate(columns):
+                if data is not None:
+                    tail_record.append(data)  # update val
+                else:
+                    tail_record.append(base_record[i + config.NUM_META_COLUMNS])  # keep old data
+            # write tail record
+            tail_index, tail_slot = page_range.write_tail_record(tail_record)
+            self.table.page_directory[tail_rid] = (page_range_index, tail_index, tail_slot)
 
-        tail_index, tail_slot = page_range.write_tail_record(record_data)
-        self.table.page_directory[tail_rid] = (page_range_index, tail_index, tail_slot)
-        page_range.update_base_record_column(base_page_index, base_slot, config.INDIRECTION_COLUMN, tail_rid)
-        page_range.update_base_record_column(base_page_index, base_slot, config.SCHEMA_ENCODING_COLUMN,
-                                             schema_encoding_num)
+            # update base record indirection & schema encoding
+            page_range.update_base_record_column(base_page_index, base_slot, config.INDIRECTION_COLUMN, tail_rid)
+            page_range.update_base_record_column(base_page_index, base_slot, config.SCHEMA_ENCODING_COLUMN, schema_encoding_num)
 
-        frame.is_dirty = True
-        frame.pin -= 1
+            frame.is_dirty = True
+            frame.pin -= 1
 
+        # remove old index entries & add new ones
+        for record in old_records:
+            self.table.index.delete(record.entire_record)
 
-      new_records = self.select(primary_key, self.table.index.key, [1] * self.table.num_columns)
-      # Remove the old records from the index and...
-      for record in old_records:
-        self.table.index.delete(record.entire_record)
+        new_records = self.select(primary_key, self.table.index.key, [1] * self.table.num_columns)
+        for record in new_records:
+            self.table.index.add(record.entire_record)
+        print(f"Updating record: {base_record} with new tail record: {tail_record}")
 
-      # add in the new records
-      for record in new_records:
-        self.table.index.add(record.entire_record)
+        return True
 
-
-      return True
+      except Exception as e:
+          print(f"Update failed: {e}")
+          for rid in rids:
+              self.lock_manage.release_record_lock(rid, id(self))  # release lock on failure
+          return False
 
     """
     :param start_range: int         # Start of the key range to aggregate
