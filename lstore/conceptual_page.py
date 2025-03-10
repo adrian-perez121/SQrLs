@@ -51,6 +51,7 @@ class ConceptualPage:
     for i in range(self.metadata_columns, self.total_columns):
       # If true we want this column, we subtract because the project_columns array starts at 0
       if projected_columns_index[i - self.metadata_columns]:
+        # print(f"slot = {slot}, page level = {physical_page_level}, pages = {self.pages[i]}")
         record.append(self.pages[i][physical_page_level].read(physical_page_slot))
       else:
         record.append(None)
@@ -62,11 +63,15 @@ class ConceptualPage:
     Specifically only for reading the metadata of a record. Useful if you need to update something
     like the indirection column or schema encoding.
     """
+
     physical_page_level = slot // 512
     physical_page_slot = slot % 512
     record = []
+    # print(f"test: slot={slot}, level={physical_page_level}")
+    # print(f"page[0] = {self.pages[0][physical_page_level]}")
+    # print(f"page[1] = {self.pages[1][physical_page_level]}")
     for i in range(self.metadata_columns):
-      print(f"slot = {slot}, pages = {self.pages[i]}")
+      # print(f"slot = {slot}, col = {i}, pages = {self.pages[i]}")
       # the first NUM_META_COLUMNS columns are the metadata columns
       record.append(self.pages[i][physical_page_level].read(physical_page_slot))
 
@@ -182,40 +187,52 @@ class ConceptualPage:
 
   def open_phys_pages(self, path):
   # use os to see all phys page in dir
+    # print(f"path: {path}")
     page_path = []
     for dir in os.listdir(path):
-        if dir.startswith("col") and dir[3:].isdigit():  # Check if column file
-            dir_path = os.path.join(path, f"col{dir}")
-            # json_path = os.path.join(path, f"col{dir}.json")
+      # print(f"dir: {dir}")      
+      if dir.startswith("col") and dir[3:].isdigit():  # Check if column file
+          dir_path = os.path.join(path, f"{dir}")
+          # print(f"path is {dir_path}")
+          # json_path = os.path.join(path, f"col{dir}.json")
 
-            # if os.path.isfile(bin_path) and os.path.isfile(json_path):
-            if os.path.isdir(dir_path):
-              bin_paths = []
-              for subdir in os.listdir(page_path):
-                # get all subdirectories into an array
-                bin_paths.append(subdir)
-                # with open(f"{path}/col{dir}/{subdir}.bin", "rb") as file:
+          # if os.path.isfile(bin_path) and os.path.isfile(json_path):
+          if os.path.isdir(dir_path):
+            # print(f"is dir")
+            bin_paths = []
+            for subdir in os.listdir(dir_path):
+              # print(f"subdir: {subdir}")
+              # get all subdirectories into an array
+              bin_paths.append(subdir)
+              # with open(f"{path}/col{dir}/{subdir}.bin", "rb") as file:
 
-              # order the subdirectories numerically
-              bin_paths.sort(key=lambda x: int(os.path.basename(x[0])))        
-              # this is the path fo the column, and each of the subdirectories inside the column folder
-              page_path.append((dir_path, bin_paths))
+            # order the subdirectories numerically
+            bin_paths.sort(key=lambda x: int(os.path.basename(x[0])))        
+            # this is the path fo the column, and each of the subdirectories inside the column folder
+            page_path.append((dir_path, bin_paths))
+    # print(f"page path: {page_path}")
+    # exit(1)
 
     # order pairs numerically
-    page_path.sort(key=lambda x: int(os.path.basename(x[0])))
+    # page_path.sort(key=lambda x: int(os.path.basename(x[3:])))
 
             # iterate through the pairs
             # self.pages = [Page.from_dict(json.load(path_json), path_bin) for path_bin, path_json in page_pairs]
-
+    self.pages = [] # reset page list
     for path_dir, path_bins in page_path:
       # a column holds multiple pages
       column = []
       # iterate through the subdirectories to create the column
+      # print(f"path bins: {path_bins}")
       for bin in path_bins:
-        column.append(Page.from_dict(path=f"{path_dir}/{bin}.bin"))
+        column.append(Page.from_dict(path=f"{path_dir}/{bin}"))
 
-      print(f"opened pages: {column} in {path_dir}")
+      # print(f"opened pages: {column} in {path_dir}")
       self.pages.append(column)
+      # print(f"col={column}\n")
+    # print("reached end")
+    # print(f"self pages is: {self.pages}")
+    # exit(1)
 
     # prob couldve done something like Page.from_dict(f"{path_dir}/{path_bins}) but it already doesnt work so i want to keep it simple
     # self.pages = [[Page.from_dict(path_dir, path_bins)] for path_dir, path_bins in page_path]
