@@ -134,41 +134,47 @@ class PageRange:
     # save base pages
     for i in range(len(self.base_pages)):
       # save json of metadata
-      with open(f"{path}/b{i}.json", "w+", encoding="utf-8") as file:
+      bp_path = os.path.join(path, f"b{i}")
+      with open(f"{bp_path}.json", "w+", encoding="utf-8") as file:
         json.dump(self.base_pages[i].to_dict(), file)
         
         # create a folder if it doesnt exist
-        os.makedirs(f"{path}/b{i}", exist_ok=True)
+        os.makedirs(bp_path, exist_ok=True)
       
       # save phys pages inside base page
       for j in range(len(self.base_pages[i].pages)):
         page = self.base_pages[i].pages[j]
+        bp_col_path = os.path.join(bp_path, f"col{j}")
         # create a folder if it doesnt exist
-        os.makedirs(f"{path}/b{i}/col{j}", exist_ok=True)
+        os.makedirs(bp_col_path, exist_ok=True)
         
         # write binary data to path
         for k in range(len(page)):
-          with open(f"{path}/b{i}/col{j}/{k}.bin", 'wb+') as data_file:
+          bin_path = os.path.join(bp_col_path, f"{k}.bin")
+          with open(bin_path, 'wb+') as data_file:
             data_file.write(page[k].data)
         
     # save tail pages
     for i in range(len(self.tail_pages)):
       # save json of metadata
-      with open(f"{path}/t{i}.json", "w+", encoding="utf-8") as file:
+      tp_path = os.path.join(path, f"t{i}")
+      with open(f"{tp_path}.json", "w+", encoding="utf-8") as file:
         json.dump(self.tail_pages[i].to_dict(), file)
         
         # create a folder if it doesnt exist
-        os.makedirs(f"{path}/t{i}", exist_ok=True)
+        os.makedirs(tp_path, exist_ok=True)
       
       # save phys pages inside tail page
       for j in range(len(self.tail_pages[i].pages)):
         page = self.tail_pages[i].pages[j]
+        tp_col_path = os.path.join(tp_path, f"col{j}")
         # create a folder if it doesnt exist
-        os.makedirs(f"{path}/t{i}/col{j}", exist_ok=True)
+        os.makedirs(tp_col_path, exist_ok=True)
         
         # write binary data to disk
         for k in range(len(page)):
-          with open(f"{path}/t{i}/col{j}/{k}.bin", 'wb+') as data_file:
+          bin_path = os.path.join(tp_col_path, f"{k}.bin")
+          with open(bin_path, 'wb+') as data_file:
             data_file.write(page[k].data)
 
   def open_conceptual_pages(self, path):

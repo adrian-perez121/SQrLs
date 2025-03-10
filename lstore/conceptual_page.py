@@ -192,7 +192,8 @@ class ConceptualPage:
 
       # iterate through the subdirectories to create the column
       for bin in path_bins:
-        column.append(Page.from_dict(path=f"{path_dir}/{bin}"))
+        path = os.path.join(path_dir, bin)
+        column.append(Page.from_dict(path=path))
       
       # add completed column to the page list
       self.pages.append(column)
