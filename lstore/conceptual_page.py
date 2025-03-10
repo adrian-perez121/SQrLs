@@ -176,17 +176,18 @@ class ConceptualPage:
               bin_paths.append(subdir)
 
             # order the subdirectories numerically
-            bin_paths.sort(key=lambda x: int(os.path.basename(x[0])))        
+            bin_paths.sort(key=lambda x: int(os.path.basename(x[0])))
             
             # this is the path fo the column, and each of the subdirectories inside the column folder
             page_path.append((dir_path, bin_paths))
   
+    new_page_path = sorted(page_path, key=lambda x: int(os.path.basename(x[0][-1])))
+
     # RESET THE PAGE LIST
-    # IT TOOK ME LIKE SIX HOURS TO FIGURE THIS OUT
     self.pages = []
 
     # probably could have done this part where the paths were appended to page_path, but i found it easier to make it modular since i was bug hunting
-    for path_dir, path_bins in page_path:
+    for path_dir, path_bins in new_page_path:
       # a column holds multiple pages
       column = []
 
