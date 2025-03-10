@@ -1,5 +1,5 @@
 from lstore.page import Page  # Assuming your Page class is defined in page.py
-import json
+import os, json
 from lstore.config import NUM_META_COLUMNS
 
 class ConceptualPage:
@@ -62,11 +62,12 @@ class ConceptualPage:
     Specifically only for reading the metadata of a record. Useful if you need to update something
     like the indirection column or schema encoding.
     """
+
     physical_page_level = slot // 512
     physical_page_slot = slot % 512
     record = []
+  
     for i in range(self.metadata_columns):
-      # the first NUM_META_COLUMNS columns are the metadata columns
       record.append(self.pages[i][physical_page_level].read(physical_page_slot))
 
     return record
@@ -87,7 +88,7 @@ class ConceptualPage:
     physical_page_slot = new_slot % 512
 
     for column_num, data in enumerate(record):
-      self.pages[column_num][physical_page_level].write(data, physical_page_slot)
+      self.pages[column_num][physical_page_level].write(value=data, slot=physical_page_slot)
 
     self.num_records += 1
     self.__allocate_new_physical_pages() # In case you fill the physical page up
@@ -115,27 +116,20 @@ class ConceptualPage:
     data["num_records"] = self.num_records
     # }
 
-    for i, column in enumerate(self.pages):
-      data[str(i)] = {}
-
-      for j, physical_page in enumerate(column):
-        data[str(i)][str(j)] = physical_page.to_dict()
     return data
 
   @classmethod
-  def from_dict(cls, data):
+  def from_dict(cls, json_path, path):
+    with open(json_path, "rb") as file:
+      data = json.load(file)
+
     new_conceptual_page = cls(data["regular_columns"])
     new_conceptual_page.metadata_columns = data["metadata_columns"]
     new_conceptual_page.num_records = data["num_records"]
 
-    pages = []
-    for column in range(new_conceptual_page.total_columns):
-      pages.append([])
-      for page in data[str(column)]:
-        pages[column].append(Page.from_dict(data[str(column)][str(page)]))
+    # call function to get phys pages
+    new_conceptual_page.open_phys_pages(path)
 
-
-    new_conceptual_page.pages = pages
     return new_conceptual_page
 
   def dump_file(self, name):
@@ -156,12 +150,51 @@ class ConceptualPage:
     new_conceptual_page.num_records = data["num_records"]
 
     pages = []
+    print("ERROR: IN CONCEPTUAL_PAGE.LOAD_FILE")
     for column in range(new_conceptual_page.total_columns):
       pages.append([])
       for page in data[str(column)]:
         json_str = json.dumps(data[str(column)][str(page)])
-        pages[column].append(Page.from_json_string(json_str))
-
+        # pages[column].append(Page.from_json_string(json_str))
 
     new_conceptual_page.pages = pages
     return new_conceptual_page
+
+  def open_phys_pages(self, path):
+  # use os to see all phys page in dir
+    page_path = []
+
+    # ex: ./col0/
+    for dir in os.listdir(path):
+      if dir.startswith("col") and dir[3:].isdigit():  # Check if column file
+          dir_path = os.path.join(path, f"{dir}")
+          if os.path.isdir(dir_path):
+            
+            bin_paths = []
+            # ex: ./col0/0.bin
+            for subdir in os.listdir(dir_path):
+              bin_paths.append(subdir)
+
+            # order the subdirectories numerically
+            bin_paths.sort(key=lambda x: int(os.path.basename(x[0])))
+            
+            # this is the path fo the column, and each of the subdirectories inside the column folder
+            page_path.append((dir_path, bin_paths))
+  
+    new_page_path = sorted(page_path, key=lambda x: int(os.path.basename(x[0][-1])))
+
+    # RESET THE PAGE LIST
+    self.pages = []
+
+    # probably could have done this part where the paths were appended to page_path, but i found it easier to make it modular since i was bug hunting
+    for path_dir, path_bins in new_page_path:
+      # a column holds multiple pages
+      column = []
+
+      # iterate through the subdirectories to create the column
+      for bin in path_bins:
+        path = os.path.join(path_dir, bin)
+        column.append(Page.from_dict(path=path))
+      
+      # add completed column to the page list
+      self.pages.append(column)

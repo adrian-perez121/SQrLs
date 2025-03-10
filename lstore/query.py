@@ -63,9 +63,7 @@ class Query:
 
           base_record = page_range.read_base_record(base_page_index, base_slot, [1] * self.table.num_columns)
 
-
           page_range.update_base_record_column(base_page_index, base_slot, config.RID_COLUMN, 0)
-
 
           self.table.index.delete(base_record)
           frame.is_dirty = True
