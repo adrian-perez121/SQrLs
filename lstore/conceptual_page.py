@@ -87,7 +87,10 @@ class ConceptualPage:
     physical_page_slot = new_slot % 512
 
     for column_num, data in enumerate(record):
-      self.pages[column_num][physical_page_level].write(data, physical_page_slot)
+      print(f"col num: {column_num}, slot: {new_slot}, page level: {physical_page_level}, len: {len(self.pages)}")
+      print(f"len page level: {len(self.pages[column_num])}, slot = {physical_page_slot}")
+      print(f"\npages: {self.pages[column_num]}")
+      self.pages[column_num][physical_page_level].write(value=data, slot=physical_page_slot)
 
     self.num_records += 1
     self.__allocate_new_physical_pages() # In case you fill the physical page up
@@ -116,7 +119,7 @@ class ConceptualPage:
     # }
 
     # metadata only, so ignore the next part
-    
+
     # for i, column in enumerate(self.pages):
     #   data[str(i)] = {}
 
@@ -125,7 +128,10 @@ class ConceptualPage:
     return data
 
   @classmethod
-  def from_dict(cls, data, path):
+  def from_dict(cls, json_path, path):
+    with open(json_path, "rb") as file:
+      data = json.load(file)
+
     new_conceptual_page = cls(data["regular_columns"])
     new_conceptual_page.metadata_columns = data["metadata_columns"]
     new_conceptual_page.num_records = data["num_records"]
@@ -161,11 +167,12 @@ class ConceptualPage:
     new_conceptual_page.num_records = data["num_records"]
 
     pages = []
+    print("ERROR: IN CONCEPTUAL_PAGE.LOAD_FILE")
     for column in range(new_conceptual_page.total_columns):
       pages.append([])
       for page in data[str(column)]:
         json_str = json.dumps(data[str(column)][str(page)])
-        pages[column].append(Page.from_json_string(json_str))
+        # pages[column].append(Page.from_json_string(json_str))
 
 
     new_conceptual_page.pages = pages
@@ -174,20 +181,44 @@ class ConceptualPage:
 
   def open_phys_pages(self, path):
   # use os to see all phys page in dir
-    page_pairs = []
+    page_path = []
     for dir in os.listdir(path):
         if dir.startswith("col") and dir[3:].isdigit():  # Check if column file
-            bin_path = os.path.join(path, f"col{dir}.bin")
-            json_path = os.path.join(path, f"col{dir}.json")
+            dir_path = os.path.join(path, f"col{dir}")
+            # json_path = os.path.join(path, f"col{dir}.json")
 
-            if os.path.isfile(bin_path) and os.path.isfile(json_path):
-                page_pairs.append((bin_path, json_path))
+            # if os.path.isfile(bin_path) and os.path.isfile(json_path):
+            if os.path.isdir(dir_path):
+              bin_paths = []
+              for subdir in os.listdir(page_path):
+                # get all subdirectories into an array
+                bin_paths.append(subdir)
+                # with open(f"{path}/col{dir}/{subdir}.bin", "rb") as file:
 
-            # order pairs numerically
-            page_pairs.sort(key=lambda x: int(os.path.basename(x[0])))
+              # order the subdirectories numerically
+              bin_paths.sort(key=lambda x: int(os.path.basename(x[0])))        
+              # this is the path fo the column, and each of the subdirectories inside the column folder
+              page_path.append((dir_path, bin_paths))
+
+    # order pairs numerically
+    page_path.sort(key=lambda x: int(os.path.basename(x[0])))
 
             # iterate through the pairs
-            self.pages = [Page.from_dict(json.load(path_json), path_bin) for path_bin, path_json in page_pairs]
+            # self.pages = [Page.from_dict(json.load(path_json), path_bin) for path_bin, path_json in page_pairs]
+
+    for path_dir, path_bins in page_path:
+      # a column holds multiple pages
+      column = []
+      # iterate through the subdirectories to create the column
+      for bin in path_bins:
+        column.append(Page.from_dict(path=f"{path_dir}/{bin}.bin"))
+
+      print(f"opened pages: {column} in {path_dir}")
+      self.pages.append(column)
+
+    # prob couldve done something like Page.from_dict(f"{path_dir}/{path_bins}) but it already doesnt work so i want to keep it simple
+    # self.pages = [[Page.from_dict(path_dir, path_bins)] for path_dir, path_bins in page_path]
+            # = [Page.from_dict(path_bin) for path_bin in bin_path]
 
 
 

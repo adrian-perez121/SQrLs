@@ -65,15 +65,19 @@ class BufferPool:
             frames: list[Frame] = self.frames[table_name]
             append_count = max(0, page_range_index - len(frames) + 1)
             frames.extend([None] * append_count)
-            frame: Frame = frames[page_range_index]
+            # frame: Frame = frames[page_range_index]
+            frame = frames[page_range_index]
             if not frame:
+                # print("reading frame from disk")
                 self.read_frame(table_name, page_range_index, num_columns)
                 frame = frames[page_range_index]
-                
+
+            # print(f"frame is {frame}, table name is {table_name}, self frames is {self.frames}\n")    
             frame.request_count += 1
             self.last_accessed = time.time()
             return frame
         else:
+            print("error: table name is not in frame list")
             # TODO OOPS
             return None
 
@@ -93,7 +97,10 @@ class BufferPool:
         )
         json_path = dir_path + ".json"
         # self.evict_frame()
+        # print(f"frame path is {json_path}\n")
+
         if os.path.exists(json_path):
+            # print("path exists")
             try:
                 with open(json_path, "rb") as file:
                     self.frames[table_name][page_range_index] = Frame(
@@ -103,8 +110,9 @@ class BufferPool:
                         from_disk=True,
                     )
             except Exception as e:
-                print(f"Exception raised while reading frame from disk: {e}")
+                print(f"Exception raised while reading frame from disk: {e.with_traceback()}")
         else:
+            # print("in else\n")
             self.frames[table_name][page_range_index] = Frame(
                 table_name, page_range_index, PageRange(num_columns)
             )
@@ -114,16 +122,18 @@ class BufferPool:
         os.makedirs(folder_path, exist_ok=True)
         if os.path.exists(folder_path):
             frame_path = os.path.join(folder_path, f"{frame.position}.json")
+            frame_dir = os.path.join(folder_path, f"{frame.position}")
+            os.makedirs(frame_dir, exist_ok=True)
             # if os.path.exists(frame_path):
             #     # print("Overwrite Log")
             #     pass
             try:
                 with open(frame_path, "w+", encoding="utf-8") as file:
                     json.dump(frame.page_range.to_dict(), file)
-                # call function to save contents
-                frame.page_range.save_contents(path=folder_path)
+                    # call function to save contents
+                    frame.page_range.save_contents(path=frame_dir)
             except Exception as e:
-                print(f"Exception raised while writing frame to disk: {e}")
+                print(f"Exception raised while writing frame to disk: {e.with_traceback()}")
         else:
             print("Somehow the write path didn't exist after making it.")
             pass

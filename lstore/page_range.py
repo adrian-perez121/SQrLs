@@ -1,4 +1,5 @@
 from lstore.conceptual_page import ConceptualPage
+from lstore.page import Page
 import lstore.config as config
 from time import time
 import os, json
@@ -145,21 +146,31 @@ class PageRange:
       # save metadata json
       with open(f"{path}/b{i}.json", "w+", encoding="utf-8") as file:
         json.dump(self.base_pages[i].to_dict(), file)
+        
+        # create a folder if it doesnt exist
+        os.makedirs(f"{path}/b{i}", exist_ok=True)
+
       # path = f"{path}/b{i}/"
       # path = f"{path}/b{i}.json"
       
       # save phys pages inside base page
       for j in range(len(self.base_pages[i].pages)):
+        page = self.base_pages[i].pages[j]
+        # create a folder if it doesnt exist
+        os.makedirs(f"{path}/b{i}/col{j}", exist_ok=True)
+        for k in range(len(page)):
         # create json of column metadata
         # save metadata to json
-        with open(f"{path}/b{i}/col{j}.json", "w+", encoding="utf-8") as file:
-          json.dump(self.base_pages[i].pages[j].to_dict(), file)
+        # with open(f"{path}/b{i}/col{j}.json", "w+", encoding="utf-8") as file:
+          # print(self.base_pages[i].pages[j][0])
+          # print(f"page is {page}, page[0] os {page[0].num_records}, page[1] is {page[1].num_records}")
+          # json.dump(self.phys_page_to_dict(page), file)
         # path = f"{path}/b{i}/col{j}.bin"
         # path = f"{path}/b{i}/col{j}.json"
 
         # write binary data to path
-        with open(f"{path}/b{i}/col{j}.bin", 'wb+') as data_file:
-          data_file.write(self.base_pages[i].pages[j].data)
+          with open(f"{path}/b{i}/col{j}/{k}.bin", 'wb+') as data_file:
+            data_file.write(page[k].data)
         
     # save tail pages
     for i in range(len(self.tail_pages)):
@@ -167,21 +178,29 @@ class PageRange:
       # save metadata json
       with open(f"{path}/t{i}.json", "w+", encoding="utf-8") as file:
         json.dump(self.tail_pages[i].to_dict(), file)
+        
+        # create a folder if it doesnt exist
+        os.makedirs(f"{path}/t{i}", exist_ok=True)
+
       # path = f"{path}/t{i}/"
       # path = f"{path}/t{i}.json"
       
       # save phys pages inside tail page
       for j in range(len(self.tail_pages[i].pages)):
+        page = self.tail_pages[i].pages[j]
+        # create a folder if it doesnt exist
+        os.makedirs(f"{path}/t{i}/col{j}", exist_ok=True)
+        for k in range(len(page)):
         # create json of column metadata
         # save metadata to json
-        with open(f"{path}/t{i}/col{j}.json", "w+", encoding="utf-8") as file:
-          json.dump(self.tail_pages[i].pages[j].to_dict(), file)
+        # with open(f"{path}/t{i}/col{j}.json", "w+", encoding="utf-8") as file:
+        #   json.dump(self.phys_page_to_dict(page), file)
         # path = f"{path}/t{i}/col{j}.bin"
         # path = f"{path}/t{i}/col{j}.json"
         
         # write binary data to path
-        with open(f"{path}/t{i}/col{j}.bin", 'wb+') as data_file:
-          data_file.write(self.tail_pages[i].pages[j].data)
+          with open(f"{path}/t{i}/col{j}/{k}.bin", 'wb+') as data_file:
+            data_file.write(page[k].data)
 
   def open_conceptual_pages(self, path):
     base_pairs = []
@@ -207,5 +226,11 @@ class PageRange:
     tail_pairs.sort(key=lambda x: int(os.path.basename(x[0])[1:]))
     
     # iterate through the base and tail pairs. send the json data and the path to the folder
-    self.base_pages = [ConceptualPage.from_dict(json.load(path_json), path_folder) for path_folder, path_json in base_pairs]
-    self.tail_pages = [ConceptualPage.from_dict(json.load(path_json), path_folder) for path_folder, path_json in tail_pairs]
+    self.base_pages = [ConceptualPage.from_dict(path_json, path_folder) for path_folder, path_json in base_pairs]
+    self.tail_pages = [ConceptualPage.from_dict(path_json, path_folder) for path_folder, path_json in tail_pairs]
+
+
+  # def phys_page_to_dict(self, page):
+  #   data = {}
+  #   data["num_records"] = page.num_records
+  #   return data
