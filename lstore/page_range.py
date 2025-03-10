@@ -1,6 +1,8 @@
 from lstore.conceptual_page import ConceptualPage
+from lstore.page import Page
 import lstore.config as config
 from time import time
+import os, json
 
 class PageRange:
 
@@ -101,22 +103,97 @@ class PageRange:
     data = {}
     data["meta_data_columns"] = self.meta_data_columns
     data["regular_columns"] = self.regular_columns
-    data["base_pages"] = [page.to_dict() for page in self.base_pages]
     data["base_pages_index"] = self.base_pages_index
     data["base_pages_slot"] = self.base_pages_slot
-    data["tail_pages"] = [page.to_dict() for page in self.tail_pages]
     data["tail_pages_index"] = self.tail_pages_index
     data["tail_pages_slot"] = self.tail_pages_slot
+    # only tracks metadata, not the actual data. the conceptual pages have their own method of being stored
+    # data["base_pages"] = [page.to_dict() for page in self.base_pages]
+    # data["tail_pages"] = [page.to_dict() for page in self.tail_pages]
     return data
 
   @classmethod
-  def from_dict(cls, data):
+  def from_dict(cls, data, path):
     new_page_range = cls(data["regular_columns"])
     new_page_range.meta_data_columns = data["meta_data_columns"]
-    new_page_range.base_pages = [ConceptualPage.from_dict(page) for page in data["base_pages"]]
     new_page_range.base_pages_index = data["base_pages_index"]
     new_page_range.base_pages_slot = data["base_pages_slot"]
-    new_page_range.tail_pages = [ConceptualPage.from_dict(page) for page in data["tail_pages"]]
     new_page_range.tail_pages_index = data["tail_pages_index"]
     new_page_range.tail_pages_slot = data["tail_pages_slot"]
+    # only reads metadata, the actual data is read in the open_conceptual_pages() function
+    # new_page_range.base_pages = [ConceptualPage.from_dict(page) for page in data["base_pages"]]
+    # new_page_range.tail_pages = [ConceptualPage.from_dict(page) for page in data["tail_pages"]]
+
+    # call function to get conceptual pages
+    new_page_range.open_conceptual_pages(path)
+    
     return new_page_range
+  
+  def save_contents(self, path):
+
+    # save base pages
+    for i in range(len(self.base_pages)):
+      # save json of metadata
+      with open(f"{path}/b{i}.json", "w+", encoding="utf-8") as file:
+        json.dump(self.base_pages[i].to_dict(), file)
+        
+        # create a folder if it doesnt exist
+        os.makedirs(f"{path}/b{i}", exist_ok=True)
+      
+      # save phys pages inside base page
+      for j in range(len(self.base_pages[i].pages)):
+        page = self.base_pages[i].pages[j]
+        # create a folder if it doesnt exist
+        os.makedirs(f"{path}/b{i}/col{j}", exist_ok=True)
+        
+        # write binary data to path
+        for k in range(len(page)):
+          with open(f"{path}/b{i}/col{j}/{k}.bin", 'wb+') as data_file:
+            data_file.write(page[k].data)
+        
+    # save tail pages
+    for i in range(len(self.tail_pages)):
+      # save json of metadata
+      with open(f"{path}/t{i}.json", "w+", encoding="utf-8") as file:
+        json.dump(self.tail_pages[i].to_dict(), file)
+        
+        # create a folder if it doesnt exist
+        os.makedirs(f"{path}/t{i}", exist_ok=True)
+      
+      # save phys pages inside tail page
+      for j in range(len(self.tail_pages[i].pages)):
+        page = self.tail_pages[i].pages[j]
+        # create a folder if it doesnt exist
+        os.makedirs(f"{path}/t{i}/col{j}", exist_ok=True)
+        
+        # write binary data to disk
+        for k in range(len(page)):
+          with open(f"{path}/t{i}/col{j}/{k}.bin", 'wb+') as data_file:
+            data_file.write(page[k].data)
+
+  def open_conceptual_pages(self, path):
+    base_pairs = []
+    tail_pairs = []
+
+    for dir in os.listdir(path):
+        if dir.startswith("b") and dir[1:].isdigit():  # Check if base
+            num = int(dir[1:])  # get number
+            folder_path = os.path.join(path, dir)
+            json_path = os.path.join(path, f"b{num}.json")
+            if os.path.isdir(folder_path) and os.path.isfile(json_path):
+                base_pairs.append((folder_path, json_path))
+
+        elif dir.startswith("t") and dir[1:].isdigit():  # Check if tail
+            num = int(dir[1:])  # get number
+            folder_path = os.path.join(path, dir)
+            json_path = os.path.join(path, f"t{num}.json")
+            if os.path.isdir(folder_path) and os.path.isfile(json_path):
+                tail_pairs.append((folder_path, json_path))
+
+    # order pairs numerically
+    base_pairs.sort(key=lambda x: int(os.path.basename(x[0])[1:]))
+    tail_pairs.sort(key=lambda x: int(os.path.basename(x[0])[1:]))
+    
+    # iterate through the base and tail pairs. send the json data and the path to the folder
+    self.base_pages = [ConceptualPage.from_dict(path_json, path_folder) for path_folder, path_json in base_pairs]
+    self.tail_pages = [ConceptualPage.from_dict(path_json, path_folder) for path_folder, path_json in tail_pairs]
