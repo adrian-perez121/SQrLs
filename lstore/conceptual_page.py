@@ -66,6 +66,7 @@ class ConceptualPage:
     physical_page_slot = slot % 512
     record = []
     for i in range(self.metadata_columns):
+      print(f"slot = {slot}, pages = {self.pages[i]}")
       # the first NUM_META_COLUMNS columns are the metadata columns
       record.append(self.pages[i][physical_page_level].read(physical_page_slot))
 
@@ -87,9 +88,9 @@ class ConceptualPage:
     physical_page_slot = new_slot % 512
 
     for column_num, data in enumerate(record):
-      print(f"col num: {column_num}, slot: {new_slot}, page level: {physical_page_level}, len: {len(self.pages)}")
-      print(f"len page level: {len(self.pages[column_num])}, slot = {physical_page_slot}")
-      print(f"\npages: {self.pages[column_num]}")
+      # print(f"col num: {column_num}, slot: {new_slot}, page level: {physical_page_level}, len: {len(self.pages)}")
+      # print(f"len page level: {len(self.pages[column_num])}, slot = {physical_page_slot}")
+      # print(f"\npages: {self.pages[column_num]}")
       self.pages[column_num][physical_page_level].write(value=data, slot=physical_page_slot)
 
     self.num_records += 1
