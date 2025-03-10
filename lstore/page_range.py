@@ -120,7 +120,7 @@ class PageRange:
     new_page_range.base_pages_slot = data["base_pages_slot"]
     new_page_range.tail_pages_index = data["tail_pages_index"]
     new_page_range.tail_pages_slot = data["tail_pages_slot"]
-    # only reads metadata, the actual data is read in the next few lines
+    # only reads metadata, the actual data is read in the open_conceptual_pages() function
     # new_page_range.base_pages = [ConceptualPage.from_dict(page) for page in data["base_pages"]]
     # new_page_range.tail_pages = [ConceptualPage.from_dict(page) for page in data["tail_pages"]]
 
@@ -129,76 +129,45 @@ class PageRange:
     
     return new_page_range
   
-    # replace the json dump with a json of the page range metadata
-  # for all bp in pr:
-  #   if file exists, otherwise make file:
-  #     for all cols:
-  #       create json of metadata
-  #       write metadata json
-  #       wb+ the bytearray
-  #     save page group metadata as json (if needed, idk if there is metadata)
-  # (repeat for all tp in pr)
   def save_contents(self, path):
 
     # save base pages
     for i in range(len(self.base_pages)):
-      # create json of metadata
-      # save metadata json
+      # save json of metadata
       with open(f"{path}/b{i}.json", "w+", encoding="utf-8") as file:
         json.dump(self.base_pages[i].to_dict(), file)
         
         # create a folder if it doesnt exist
         os.makedirs(f"{path}/b{i}", exist_ok=True)
-
-      # path = f"{path}/b{i}/"
-      # path = f"{path}/b{i}.json"
       
       # save phys pages inside base page
       for j in range(len(self.base_pages[i].pages)):
         page = self.base_pages[i].pages[j]
         # create a folder if it doesnt exist
         os.makedirs(f"{path}/b{i}/col{j}", exist_ok=True)
-        for k in range(len(page)):
-        # create json of column metadata
-        # save metadata to json
-        # with open(f"{path}/b{i}/col{j}.json", "w+", encoding="utf-8") as file:
-          # print(self.base_pages[i].pages[j][0])
-          # print(f"page is {page}, page[0] os {page[0].num_records}, page[1] is {page[1].num_records}")
-          # json.dump(self.phys_page_to_dict(page), file)
-        # path = f"{path}/b{i}/col{j}.bin"
-        # path = f"{path}/b{i}/col{j}.json"
-
+        
         # write binary data to path
+        for k in range(len(page)):
           with open(f"{path}/b{i}/col{j}/{k}.bin", 'wb+') as data_file:
             data_file.write(page[k].data)
         
     # save tail pages
     for i in range(len(self.tail_pages)):
-      # create json of metadata
-      # save metadata json
+      # save json of metadata
       with open(f"{path}/t{i}.json", "w+", encoding="utf-8") as file:
         json.dump(self.tail_pages[i].to_dict(), file)
         
         # create a folder if it doesnt exist
         os.makedirs(f"{path}/t{i}", exist_ok=True)
-
-      # path = f"{path}/t{i}/"
-      # path = f"{path}/t{i}.json"
       
       # save phys pages inside tail page
       for j in range(len(self.tail_pages[i].pages)):
         page = self.tail_pages[i].pages[j]
         # create a folder if it doesnt exist
         os.makedirs(f"{path}/t{i}/col{j}", exist_ok=True)
-        for k in range(len(page)):
-        # create json of column metadata
-        # save metadata to json
-        # with open(f"{path}/t{i}/col{j}.json", "w+", encoding="utf-8") as file:
-        #   json.dump(self.phys_page_to_dict(page), file)
-        # path = f"{path}/t{i}/col{j}.bin"
-        # path = f"{path}/t{i}/col{j}.json"
         
-        # write binary data to path
+        # write binary data to disk
+        for k in range(len(page)):
           with open(f"{path}/t{i}/col{j}/{k}.bin", 'wb+') as data_file:
             data_file.write(page[k].data)
 
@@ -228,9 +197,3 @@ class PageRange:
     # iterate through the base and tail pairs. send the json data and the path to the folder
     self.base_pages = [ConceptualPage.from_dict(path_json, path_folder) for path_folder, path_json in base_pairs]
     self.tail_pages = [ConceptualPage.from_dict(path_json, path_folder) for path_folder, path_json in tail_pairs]
-
-
-  # def phys_page_to_dict(self, page):
-  #   data = {}
-  #   data["num_records"] = page.num_records
-  #   return data

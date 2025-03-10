@@ -51,7 +51,6 @@ class ConceptualPage:
     for i in range(self.metadata_columns, self.total_columns):
       # If true we want this column, we subtract because the project_columns array starts at 0
       if projected_columns_index[i - self.metadata_columns]:
-        # print(f"slot = {slot}, page level = {physical_page_level}, pages = {self.pages[i]}")
         record.append(self.pages[i][physical_page_level].read(physical_page_slot))
       else:
         record.append(None)
@@ -67,12 +66,8 @@ class ConceptualPage:
     physical_page_level = slot // 512
     physical_page_slot = slot % 512
     record = []
-    # print(f"test: slot={slot}, level={physical_page_level}")
-    # print(f"page[0] = {self.pages[0][physical_page_level]}")
-    # print(f"page[1] = {self.pages[1][physical_page_level]}")
+  
     for i in range(self.metadata_columns):
-      # print(f"slot = {slot}, col = {i}, pages = {self.pages[i]}")
-      # the first NUM_META_COLUMNS columns are the metadata columns
       record.append(self.pages[i][physical_page_level].read(physical_page_slot))
 
     return record
@@ -93,9 +88,6 @@ class ConceptualPage:
     physical_page_slot = new_slot % 512
 
     for column_num, data in enumerate(record):
-      # print(f"col num: {column_num}, slot: {new_slot}, page level: {physical_page_level}, len: {len(self.pages)}")
-      # print(f"len page level: {len(self.pages[column_num])}, slot = {physical_page_slot}")
-      # print(f"\npages: {self.pages[column_num]}")
       self.pages[column_num][physical_page_level].write(value=data, slot=physical_page_slot)
 
     self.num_records += 1
@@ -124,13 +116,6 @@ class ConceptualPage:
     data["num_records"] = self.num_records
     # }
 
-    # metadata only, so ignore the next part
-
-    # for i, column in enumerate(self.pages):
-    #   data[str(i)] = {}
-
-    #   for j, physical_page in enumerate(column):
-    #     data[str(i)][str(j)] = physical_page.to_dict()
     return data
 
   @classmethod
@@ -144,14 +129,6 @@ class ConceptualPage:
 
     # call function to get phys pages
     new_conceptual_page.open_phys_pages(path)
-
-    # old version:
-    # pages = []
-    # for column in range(new_conceptual_page.total_columns):
-    #   pages.append([])
-    #   for page in data[str(column)]:
-    #     pages[column].append(Page.from_dict(data[str(column)][str(page)]))
-    # new_conceptual_page.pages = pages
 
     return new_conceptual_page
 
@@ -180,75 +157,42 @@ class ConceptualPage:
         json_str = json.dumps(data[str(column)][str(page)])
         # pages[column].append(Page.from_json_string(json_str))
 
-
     new_conceptual_page.pages = pages
     return new_conceptual_page
-  
 
   def open_phys_pages(self, path):
   # use os to see all phys page in dir
-    # print(f"path: {path}")
     page_path = []
+
+    # ex: ./col0/
     for dir in os.listdir(path):
-      # print(f"dir: {dir}")      
       if dir.startswith("col") and dir[3:].isdigit():  # Check if column file
           dir_path = os.path.join(path, f"{dir}")
-          # print(f"path is {dir_path}")
-          # json_path = os.path.join(path, f"col{dir}.json")
-
-          # if os.path.isfile(bin_path) and os.path.isfile(json_path):
           if os.path.isdir(dir_path):
-            # print(f"is dir")
+            
             bin_paths = []
+            # ex: ./col0/0.bin
             for subdir in os.listdir(dir_path):
-              # print(f"subdir: {subdir}")
-              # get all subdirectories into an array
               bin_paths.append(subdir)
-              # with open(f"{path}/col{dir}/{subdir}.bin", "rb") as file:
 
             # order the subdirectories numerically
             bin_paths.sort(key=lambda x: int(os.path.basename(x[0])))        
+            
             # this is the path fo the column, and each of the subdirectories inside the column folder
             page_path.append((dir_path, bin_paths))
-    # print(f"page path: {page_path}")
-    # exit(1)
+  
+    # RESET THE PAGE LIST
+    # IT TOOK ME LIKE SIX HOURS TO FIGURE THIS OUT
+    self.pages = []
 
-    # order pairs numerically
-    # page_path.sort(key=lambda x: int(os.path.basename(x[3:])))
-
-            # iterate through the pairs
-            # self.pages = [Page.from_dict(json.load(path_json), path_bin) for path_bin, path_json in page_pairs]
-    self.pages = [] # reset page list
+    # probably could have done this part where the paths were appended to page_path, but i found it easier to make it modular since i was bug hunting
     for path_dir, path_bins in page_path:
       # a column holds multiple pages
       column = []
+
       # iterate through the subdirectories to create the column
-      # print(f"path bins: {path_bins}")
       for bin in path_bins:
         column.append(Page.from_dict(path=f"{path_dir}/{bin}"))
-
-      # print(f"opened pages: {column} in {path_dir}")
+      
+      # add completed column to the page list
       self.pages.append(column)
-      # print(f"col={column}\n")
-    # print("reached end")
-    # print(f"self pages is: {self.pages}")
-    # exit(1)
-
-    # prob couldve done something like Page.from_dict(f"{path_dir}/{path_bins}) but it already doesnt work so i want to keep it simple
-    # self.pages = [[Page.from_dict(path_dir, path_bins)] for path_dir, path_bins in page_path]
-            # = [Page.from_dict(path_bin) for path_bin in bin_path]
-
-
-
-            # for path_folder, path_json in page_pairs:
-            #     # inside each page range, read the metadata
-            #     with open(path_json, "r") as page_metadata:
-            #         data = json.load(page_metadata)
-
-            #     # get data from json
-            #     num_records = data["num_records"]
-
-            #     # use the data to create a page range object
-            #     new_page = Page(num_records=num_records)
-            #     # add page to page group
-            #     page_group.append(new_page)
