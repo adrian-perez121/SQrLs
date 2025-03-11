@@ -120,6 +120,9 @@ class Query:
 
         pk_column = self.table.index.key
 
+        while not self.table.lock_manager.acquire_lock(columns[pk_column], "write"):
+          pass
+
         if columns[pk_column] in self.table.index.indices[pk_column]:
           return False
 
@@ -130,6 +133,9 @@ class Query:
         frame: Frame = self.bufferpool.get_frame(self.table.name, self.table.page_ranges_index, self.table.num_columns)
         frame.pin += 1
         page_range: PageRange = frame.page_range
+
+        while not self.table.lock_manager.acquire_lock(f"page_range_{self.table.page_ranges_index}_bp{page_range.base_pages_index}", "write"):
+          pass
 
         frame.is_dirty = True
         # TODO: Decrement Pin Count
@@ -146,6 +152,9 @@ class Query:
       # - add the record in the index
 
         frame.pin -= 1
+
+        self.table.lock_manager.release_lock(f"page_range_{self.table.page_ranges_index}_bp{page_range.base_pages_index}", "write")
+        self.table.lock_manager.release_lock(columns[pk_column], "write")
 
         self.table.add_new_page_range() # Page range is only added if needed
 

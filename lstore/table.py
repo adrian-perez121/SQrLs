@@ -3,6 +3,7 @@ from lstore.index import Index
 from lstore.page_range import PageRange
 from time import time
 import threading
+from lstore.LockManager import LockManager
 from lstore.page_range import PageRange
 
 # 4 Meta Data Columns {
@@ -26,6 +27,7 @@ class Table:
         self.page_ranges_index = 0
         self.page_directory = {}
         self.index: Index = Index(self)
+        self.lock_manager = LockManager()
         self.rid = 1
 
         self.bufferpool: BufferPool = bufferpool
@@ -35,7 +37,7 @@ class Table:
       tmp = self.rid
       self.rid += 1
       return tmp
-      
+
 
     def add_new_page_range(self):
       if not self.bufferpool.get_frame(self.name, self.page_ranges_index, self.num_columns).page_range.has_base_page_capacity():
