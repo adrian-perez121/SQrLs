@@ -61,8 +61,13 @@ class Database():
         if os.path.exists(table_path):
             with open(f"{table_path}.json", 'r') as file:
                 data = json.load(file)
+                new_page_directory = {}
+                for i, k in enumerate(data["page_directory_keys"]):
+                    new_page_directory[k] = tuple(data["page_directory_values"][i])
+
+
                 table = Table(name=data["name"], num_columns=data["num_columns"], key=data["key"],
-                              bufferpool=self.bufferpool, page_ranges_index=data["page_ranges_index"], page_directory=data["page_directory"], rid=data["rid"])
+                              bufferpool=self.bufferpool, page_ranges_index= data["page_ranges_index"], page_directory=new_page_directory, rid=data["rid"])
                 self.tables[name] = table
                 with open(f"{table_path}index.json", 'r') as file:
                     table.index = Index.from_arr(table, json.load(file))

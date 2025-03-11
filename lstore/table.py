@@ -5,7 +5,7 @@ from time import time
 import threading
 from lstore.LockManager import RWLock
 from collections import defaultdict
-
+import json
 from lstore.page_range import PageRange
 
 # 4 Meta Data Columns {
@@ -49,7 +49,11 @@ class Table:
       data["num_columns"] = self.num_columns
       data["key"] = self.key
       data["page_ranges_index"] = self.page_ranges_index
-      data["page_directory"] = self.page_directory
+      data["page_directory_keys"] = []
+      data["page_directory_values"] = []
+      for k,v in self.page_directory.items():
+        data["page_directory_keys"].append(k)
+        data["page_directory_values"].append(v)
       data["rid"] = int(self.rid)
 
       return data
