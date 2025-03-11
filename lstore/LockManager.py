@@ -1,11 +1,13 @@
+from typing import Literal
 from lstore.RecordLock import RecordLock
 
 class LockManager:
     def __init__(self):
-        self.locks = {}
+        self.locks: dict[int, RecordLock] = {}
         pass
 
-    def acquire_lock(self, key, lock_type):
+    def acquire_lock(self, key: int, lock_type: Literal['read', 'write']):
+        # Create lock from key of record
         if key not in self.locks:
             self.locks[key] = RecordLock()
         if lock_type == 'read':
@@ -14,7 +16,7 @@ class LockManager:
             return self.locks[key].acquire_write()
         return False
 
-    def release_lock(self, key, lock_type):
+    def release_lock(self, key: int, lock_type: Literal['read', 'write']):
         if key not in self.locks:
             return False
         if lock_type == 'read':

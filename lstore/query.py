@@ -138,7 +138,6 @@ class Query:
           pass
 
         frame.is_dirty = True
-        # TODO: Decrement Pin Count
 
         # Create an array with the metadata columns, and then add in the regular data columns
         new_record = self.create_metadata(rid)
