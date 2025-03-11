@@ -30,8 +30,53 @@ class Query:
     # Returns False if insert fails for whatever reason
     """
     def insert(self, *columns):
+<<<<<<< Updated upstream
         schema_encoding = '0' * self.table.num_columns
         pass
+=======
+        if len(columns) != self.table.num_columns:
+          return False
+
+        pk_column = self.table.index.key
+
+        if columns[pk_column] in self.table.index.indices[pk_column]:
+          return False
+
+        # TODO: 2PL | Lock (Mutex) for table
+        rid = self.table.new_rid()
+        # TODO: 2PL | Release Lock (Mutex) for table
+        
+        # TODO: Request Page logic (???) maybe link page range logic to bufferpool
+        # bufferpool request range (self.table, index)
+        # TODO: 2PL | Read page range capacity (with lock) here or in get frame, allocate if needed. 
+        frame: Frame = self.bufferpool.get_frame(self.table.name, self.table.page_ranges_index, self.table.num_columns)
+        frame.pin += 1
+        page_range: PageRange = frame.page_range
+
+        frame.is_dirty = True
+        # TODO: Decrement Pin Count
+
+        # Create an array with the metadata columns, and then add in the regular data columns
+        new_record = self.create_metadata(rid)
+        for data in columns:
+          new_record.append(data)
+          
+        
+        
+        # - write this record into the table
+        index, slot = page_range.write_base_record(new_record)
+        
+        # - add the RID and location into the page directory
+        self.table.page_directory[rid] = (self.table.page_ranges_index, index, slot)
+        self.table.index.add(new_record)
+      # - add the record in the index
+
+        frame.pin -= 1
+
+        self.table.add_new_page_range() # Page range is only added if needed
+
+        return True
+>>>>>>> Stashed changes
 
     
     """

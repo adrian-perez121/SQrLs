@@ -83,7 +83,7 @@ for key in keys:
     query = Query(grades_table)
     
     result = query.select_version(key, 0, [1, 1, 1, 1, 1], -1)[0].columns
-    if correct != result:
+    if result != correct:
         print('select error on primary key', key, ':', result, ', correct:', correct)
         score -= 1
 print('Version -1 Score:', score, '/', len(keys))
