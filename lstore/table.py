@@ -3,6 +3,9 @@ from lstore.index import Index
 from lstore.page_range import PageRange
 from time import time
 import threading
+from lstore.LockManager import RWLock
+from collections import defaultdict
+
 from lstore.page_range import PageRange
 
 # 4 Meta Data Columns {
@@ -19,14 +22,18 @@ class Table:
     :param num_columns: int     #Number of Columns: all columns are integer
     :param key: int             #Index of table key in columns
     """
-    def __init__(self, name, num_columns, key, bufferpool):
+    def __init__(self, name, num_columns, key, bufferpool, page_ranges_index=0, page_directory={}, rid=1):
         self.name: str = name
         self.key = key
         self.num_columns = num_columns
-        self.page_ranges_index = 0
-        self.page_directory = {}
+        self.page_ranges_index = page_ranges_index
+        self.page_directory = page_directory
         self.index: Index = Index(self)
         self.rid = 1
+
+        self.lock_manager = defaultdict()
+        self.new_record = threading.Lock()
+        self.update_record = threading.Lock()
 
         self.bufferpool: BufferPool = bufferpool
         pass
@@ -35,7 +42,17 @@ class Table:
       tmp = self.rid
       self.rid += 1
       return tmp
-      
+
+    def to_dict(self):
+      data = {}
+      data["name"] = self.name
+      data["num_columns"] = self.num_columns
+      data["key"] = self.key
+      data["page_ranges_index"] = self.page_ranges_index
+      data["page_directory"] = self.page_directory
+      data["rid"] = int(self.rid)
+
+      return data
 
     def add_new_page_range(self):
       if not self.bufferpool.get_frame(self.name, self.page_ranges_index, self.num_columns).page_range.has_base_page_capacity():
