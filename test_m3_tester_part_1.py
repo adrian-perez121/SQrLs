@@ -1,9 +1,16 @@
+import glob, os, shutil
 from lstore.db import Database
 from lstore.query import Query
 from lstore.transaction import Transaction
 from lstore.transaction_worker import TransactionWorker
 
 from random import choice, randint, sample, seed
+
+files = glob.glob(os.path.join(os.getcwd(), "ECS165*"))
+for f in files:
+    if os.path.isfile(f):
+        os.remove(f)
+    else: shutil.rmtree(f)
 
 db = Database()
 db.open('./ECS165')
