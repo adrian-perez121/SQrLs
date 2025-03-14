@@ -1,5 +1,5 @@
 
-from lstore.LockManager import RWLock
+from lstore.LockManager import Read_Write_Lock
 from lstore.query import Query
 
 
@@ -36,10 +36,10 @@ class Transaction:
 
                 if key not in self.table.lock_manager:
                     self.insert_locks.add(key)
-                    self.table.lock_manager[key] = RWLock()
+                    self.table.lock_manager[key] = Read_Write_Lock()
 
                 if key not in self.write_locks and key not in self.insert_locks:
-                    if self.table.lock_manager[key].acquire_wlock():
+                    if self.table.lock_manager[key].acquire_write():
                         self.write_locks.add(key)
                     else:
                         return self.abort()  # Abort if write lock fails
@@ -61,9 +61,9 @@ class Transaction:
     """
     def abort(self):
         for key in self.read_locks:
-            self.table.lock_manager[key].release_rlock()
+            self.table.lock_manager[key].release_read()
         for key in self.write_locks:
-            self.table.lock_manager[key].release_wlock()
+            self.table.lock_manager[key].release_write()
         for key in self.insert_locks:
             del self.table.lock_manager[key]  # Cleanup inserted records
         return False
@@ -85,9 +85,9 @@ class Transaction:
 
         # Release all locks after successful execution
         for key in self.read_locks:
-            self.table.lock_manager[key].release_rlock()
+            self.table.lock_manager[key].release_read()
         for key in self.write_locks:
-            self.table.lock_manager[key].release_wlock()
+            self.table.lock_manager[key].release_write()
         for key in self.insert_locks:
-            self.table.lock_manager[key].release_wlock()
+            self.table.lock_manager[key].release_write()
         return True
