@@ -1,3 +1,4 @@
+import threading
 import time
 from binascii import b2a_hex
 
@@ -135,15 +136,16 @@ class Query:
         # TODO: Decrement Pin Count
 
         # Create an array with the metadata columns, and then add in the regular data columns
-        new_record = self.create_metadata(rid)
-        for data in columns:
-          new_record.append(data)
-        # - write this record into the table
-        index, slot = page_range.write_base_record(new_record)
-        # - add the RID and location into the page directory
-        self.table.page_directory[rid] = (self.table.page_ranges_index, index, slot)
-        self.table.index.add(new_record)
-      # - add the record in the index
+        with self.table.new_record:
+          new_record = self.create_metadata(rid)
+          for data in columns:
+            new_record.append(data)
+          # - write this record into the table
+          index, slot = page_range.write_base_record(new_record)
+          # - add the RID and location into the page directory
+          self.table.page_directory[rid] = (self.table.page_ranges_index, index, slot)
+          self.table.index.add(new_record)
+        # - add the record in the index
 
         frame.pin -= 1
 
@@ -166,23 +168,24 @@ class Query:
 
     def __select_base_records(self, search_key, search_key_index, projected_columns_index):
       records = []
-      rids = self.table.index.locate(search_key_index, search_key)
+      rids = self.table.index.locate(search_key_index, search_key).copy()
 
       if rids is None:
         return []
 
-      for rid in rids:
-        page_range_index, base_page_index, slot = self.table.page_directory[rid]
+      with threading.RLock():
+        for rid in rids:
+          page_range_index, base_page_index, slot = self.table.page_directory[rid]
 
-        # Get the needed page range
-        frame: Frame = self.bufferpool.get_frame(self.table.name, page_range_index, self.table.num_columns)
-        frame.pin += 1
-        page_range: PageRange = frame.page_range
+          # Get the needed page range
+          frame: Frame = self.bufferpool.get_frame(self.table.name, page_range_index, self.table.num_columns)
+          frame.pin += 1
+          page_range: PageRange = frame.page_range
 
-        # We know we can read from a base record because the rid in a page directory points to a page record
-        record_data = page_range.read_base_record(base_page_index, slot, projected_columns_index)
-        record = self.__build_record(record_data, search_key)
-        records.append(record)
+          # We know we can read from a base record because the rid in a page directory points to a page record
+          record_data = page_range.read_base_record(base_page_index, slot, projected_columns_index)
+          record = self.__build_record(record_data, search_key)
+          records.append(record)
 
         frame.pin -= 1
 
@@ -201,45 +204,46 @@ class Query:
       records = self.__select_base_records(search_key, search_key_index, projected_columns_index)
       version_records = [] # To store the wanted versions of the records
 
-      for base_record in records:
-        if base_record.indirection == 0: # This means it is a base record so there is no other versions
-          version_records.append(base_record)
-        else: # There are some tail records
-          # Version 0 is the latest version
-          version_num = 0
-          current_rid = base_record.indirection
-          page_range_index, tail_index, tail_slot = self.table.page_directory[current_rid]
-
-          frame: Frame = self.bufferpool.get_frame(self.table.name, page_range_index,
-                                                   self.table.num_columns)
-          frame.pin += 1
-          page_range: PageRange = frame.page_range
-          return_base_record = False
-          # Get the tail record
-          tail_record = page_range.read_tail_record(tail_index, tail_slot, projected_columns_index)
-          # if the indirection for the tail record is the base record rid we hit the end, so just return the base record
-          # else combine the data from the latest tail with columns that haven't been updated in base.
-          while version_num > relative_version:
-            if tail_record[config.INDIRECTION_COLUMN] == base_record.rid:
-              return_base_record = True
-              break
-            current_rid = tail_record[config.INDIRECTION_COLUMN]
-            page_range_index, tail_index, tail_slot = self.table.page_directory[current_rid]
-            tail_record = page_range.read_tail_record(tail_index, tail_slot, projected_columns_index)
-            version_num -= 1
-
-          frame.pin -= 1
-
-          # relative_version < version_num means that we ran out of versions to traverse
-          if return_base_record or relative_version < version_num:
+      with threading.Lock():
+        for base_record in records:
+          if base_record.indirection == 0: # This means it is a base record so there is no other versions
             version_records.append(base_record)
-          else:
-            for i, data in enumerate(self.__number_to_bit_array(tail_record[config.SCHEMA_ENCODING_COLUMN], self.table.num_columns)):
-              # Only add in the updated data
-              if data == 1:
-                base_record.columns[i] = tail_record[config.NUM_META_COLUMNS + i]
+          else: # There are some tail records
+            # Version 0 is the latest version
+            version_num = 0
+            current_rid = base_record.indirection
+            page_range_index, tail_index, tail_slot = self.table.page_directory[current_rid]
 
-          version_records.append(base_record)
+            frame: Frame = self.bufferpool.get_frame(self.table.name, page_range_index,
+                                                     self.table.num_columns)
+            frame.pin += 1
+            page_range: PageRange = frame.page_range
+            return_base_record = False
+            # Get the tail record
+            tail_record = page_range.read_tail_record(tail_index, tail_slot, projected_columns_index)
+            # if the indirection for the tail record is the base record rid we hit the end, so just return the base record
+            # else combine the data from the latest tail with columns that haven't been updated in base.
+            while version_num > relative_version:
+              if tail_record[config.INDIRECTION_COLUMN] == base_record.rid:
+                return_base_record = True
+                break
+              current_rid = tail_record[config.INDIRECTION_COLUMN]
+              page_range_index, tail_index, tail_slot = self.table.page_directory[current_rid]
+              tail_record = page_range.read_tail_record(tail_index, tail_slot, projected_columns_index)
+              version_num -= 1
+
+            frame.pin -= 1
+
+            # relative_version < version_num means that we ran out of versions to traverse
+            if return_base_record or relative_version < version_num:
+              version_records.append(base_record)
+            else:
+              for i, data in enumerate(self.__number_to_bit_array(tail_record[config.SCHEMA_ENCODING_COLUMN], self.table.num_columns)):
+                # Only add in the updated data
+                if data == 1:
+                  base_record.columns[i] = tail_record[config.NUM_META_COLUMNS + i]
+
+            version_records.append(base_record)
 
 
 
@@ -302,7 +306,7 @@ class Query:
       if columns[pk_column] is not None and primary_key != columns[pk_column]:
         return False
 
-      rids = self.table.index.locate(self.table.key, primary_key)
+      rids = self.table.index.locate(self.table.key, primary_key).copy()
 
       # Now that we have the RIDS, lets remove the old version of the records from our index, but this will
       # be done after we are done updating
@@ -311,56 +315,57 @@ class Query:
       if rids is None:
         return False
 
-      for rid in rids:
-        page_range_index, base_page_index, base_slot = self.table.page_directory[rid]
+      with self.table.update_record:
+        for rid in rids:
+          page_range_index, base_page_index, base_slot = self.table.page_directory[rid]
 
-        frame: Frame = self.bufferpool.get_frame(self.table.name, page_range_index,
-                                                 self.table.num_columns)
-        frame.pin += 1
-        page_range: PageRange = frame.page_range
+          frame: Frame = self.bufferpool.get_frame(self.table.name, page_range_index,
+                                                   self.table.num_columns)
+          frame.pin += 1
+          page_range: PageRange = frame.page_range
 
-        base_record = page_range.read_base_record(base_page_index, base_slot, [0] * self.table.num_columns)
-        record_data = None
-        schema_encoding_num = None
+          base_record = page_range.read_base_record(base_page_index, base_slot, [0] * self.table.num_columns)
+          record_data = None
+          schema_encoding_num = None
 
-        if base_record[config.INDIRECTION_COLUMN] == 0:
-          tail_rid = self.table.new_rid()
-          schema_encoding_num = self.__update_schema_encoding([0] * self.table.num_columns, columns)
-          schema_encoding_num = self.__bit_array_to_number(schema_encoding_num)
+          if base_record[config.INDIRECTION_COLUMN] == 0:
+            tail_rid = self.table.new_rid()
+            schema_encoding_num = self.__update_schema_encoding([0] * self.table.num_columns, columns)
+            schema_encoding_num = self.__bit_array_to_number(schema_encoding_num)
 
-          record_data = self.create_metadata(tail_rid, base_record[config.RID_COLUMN], schema_encoding_num)
-          for data in columns:
-            if data is not None:
-              record_data.append(data)
-            else:
-              record_data.append(0)
-        else:
-          # The base record has a tail record. This is the cumulative implementation.
-          # v Contains all the columns that have been updated so far v
-          base_record_updated_schema_encoding = self.__number_to_bit_array(base_record[config.SCHEMA_ENCODING_COLUMN], self.table.num_columns)
-          latest_tail_rid = base_record[config.INDIRECTION_COLUMN]
-          page_range_index, latest_tail_index, latest_tail_slot = self.table.page_directory[latest_tail_rid]
+            record_data = self.create_metadata(tail_rid, base_record[config.RID_COLUMN], schema_encoding_num)
+            for data in columns:
+              if data is not None:
+                record_data.append(data)
+              else:
+                record_data.append(0)
+          else:
+            # The base record has a tail record. This is the cumulative implementation.
+            # v Contains all the columns that have been updated so far v
+            base_record_updated_schema_encoding = self.__number_to_bit_array(base_record[config.SCHEMA_ENCODING_COLUMN], self.table.num_columns)
+            latest_tail_rid = base_record[config.INDIRECTION_COLUMN]
+            page_range_index, latest_tail_index, latest_tail_slot = self.table.page_directory[latest_tail_rid]
 
-          latest_tail_record = page_range.read_tail_record(latest_tail_index, latest_tail_slot, base_record_updated_schema_encoding)
-          tail_rid = self.table.new_rid()
+            latest_tail_record = page_range.read_tail_record(latest_tail_index, latest_tail_slot, base_record_updated_schema_encoding)
+            tail_rid = self.table.new_rid()
 
-          schema_encoding_num = self.__update_schema_encoding(base_record_updated_schema_encoding, columns)
-          schema_encoding_num = self.__bit_array_to_number(base_record_updated_schema_encoding)
+            schema_encoding_num = self.__update_schema_encoding(base_record_updated_schema_encoding, columns)
+            schema_encoding_num = self.__bit_array_to_number(base_record_updated_schema_encoding)
 
-          record_data = self.create_metadata(tail_rid, latest_tail_rid, schema_encoding_num)
-          for i, data in enumerate(columns):
-            if data is not None:
-              record_data.append(data)
-            elif latest_tail_record[i + config.NUM_META_COLUMNS]: # If there's data actually there
-              record_data.append(latest_tail_record[i + config.NUM_META_COLUMNS]) # Offset for metadata columns
-            else:
-              record_data.append(0)
+            record_data = self.create_metadata(tail_rid, latest_tail_rid, schema_encoding_num)
+            for i, data in enumerate(columns):
+              if data is not None:
+                record_data.append(data)
+              elif latest_tail_record[i + config.NUM_META_COLUMNS]: # If there's data actually there
+                record_data.append(latest_tail_record[i + config.NUM_META_COLUMNS]) # Offset for metadata columns
+              else:
+                record_data.append(0)
 
-        tail_index, tail_slot = page_range.write_tail_record(record_data)
-        self.table.page_directory[tail_rid] = (page_range_index, tail_index, tail_slot)
-        page_range.update_base_record_column(base_page_index, base_slot, config.INDIRECTION_COLUMN, tail_rid)
-        page_range.update_base_record_column(base_page_index, base_slot, config.SCHEMA_ENCODING_COLUMN,
-                                             schema_encoding_num)
+          tail_index, tail_slot = page_range.write_tail_record(record_data)
+          self.table.page_directory[tail_rid] = (page_range_index, tail_index, tail_slot)
+          page_range.update_base_record_column(base_page_index, base_slot, config.INDIRECTION_COLUMN, tail_rid)
+          page_range.update_base_record_column(base_page_index, base_slot, config.SCHEMA_ENCODING_COLUMN,
+                                               schema_encoding_num)
 
         frame.is_dirty = True
         frame.pin -= 1
