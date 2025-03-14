@@ -66,7 +66,7 @@ class Transaction:
             self.table.lock_manager[key].release_write()
         for key in self.insert_locks:
             del self.table.lock_manager[key]  # Cleanup inserted records
-        print("aborting")
+        # print("aborting")
         return False
 
     """
@@ -91,5 +91,8 @@ class Transaction:
             self.table.lock_manager[key].release_write()
         for key in self.insert_locks:
             self.table.lock_manager[key].release_write()
-        print("committing")
+        # print("committing")
+
+        # TODO: log queries to the log
+
         return True
