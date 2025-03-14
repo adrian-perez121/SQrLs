@@ -33,9 +33,9 @@ class TransactionWorker:
             self.stats.append(success) # log stats
 
             # print("checking xact")
-            if(success==False): # if aborted
-                # print("aborted, moving xact to back")
-                self.transactions.append(transaction) # adds xact to end of queue
+            # if(success==False): # if aborted
+            #     # print("aborted, moving xact to back")
+            #     self.transactions.append(transaction) # adds xact to end of queue
 
         self.result = len(list(filter(lambda x: x, self.stats)))
 
