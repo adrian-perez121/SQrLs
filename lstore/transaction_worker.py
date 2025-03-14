@@ -1,11 +1,12 @@
 import threading
+from collections import deque
 
 class TransactionWorker:
     """
     # Creates a transaction worker object.
     """
     def __init__(self):
-        self.transactions = []
+        self.transactions = deque()
         self.stats = []
         self.result = 0
         self._thread = None
@@ -26,9 +27,16 @@ class TransactionWorker:
         self._thread.start()
 
     def __run(self):
-        for transaction in self.transactions:
-            success = transaction.run()
-            self.stats.append(success)
+        while(len(self.transactions)!=0):
+            transaction = self.transactions.popleft() # gets first xact in queue
+            success = transaction.run() # run transaction
+            self.stats.append(success) # log stats
+
+            # print("checking xact")
+            if(success==False): # if aborted
+                # print("aborted, moving xact to back")
+                self.transactions.append(transaction) # adds xact to end of queue
+
         self.result = len(list(filter(lambda x: x, self.stats)))
 
     """

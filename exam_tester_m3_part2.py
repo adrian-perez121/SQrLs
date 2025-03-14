@@ -33,7 +33,7 @@ for i in range(0, number_of_records):
     key = 92106429 + i
     keys.append(key)
     records[key] = [key, randint(i * 20, (i + 1) * 20), randint(i * 20, (i + 1) * 20), randint(i * 20, (i + 1) * 20), randint(i * 20, (i + 1) * 20)]
-    print(records[key])
+    # print(records[key])
 
 transaction_workers = []
 transactions = []
@@ -78,7 +78,7 @@ for i in range(num_threads):
 for i in range(num_threads):
     transaction_workers[i].join()
 
-
+# exit(1)
 score = len(keys)
 for key in keys:
     correct = records[key]

@@ -77,7 +77,7 @@ for i in range(num_threads):
 for i in range(num_threads):
     transaction_workers[i].join()
 
-
+# exit(1)
 score = len(keys)
 for key in keys:
     try:
