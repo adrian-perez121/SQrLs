@@ -168,7 +168,7 @@ class Query:
 
     def __select_base_records(self, search_key, search_key_index, projected_columns_index):
       records = []
-      rids = self.table.index.locate(search_key_index, search_key).copy()
+      rids = self.table.index.locate(search_key_index, search_key)
 
       if rids is None:
         return []

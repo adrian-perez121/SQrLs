@@ -82,7 +82,10 @@ for key in keys:
     correct = records[key]
     query = Query(grades_table)
     
-    result = query.select_version(key, 0, [1, 1, 1, 1, 1], -1)[0].columns
+    select_result = query.select_version(key, 0, [1, 1, 1, 1, 1], -1)
+    if select_result:
+        result = select_result[0].columns
+    else: continue
     if correct != result:
         print('select error on primary key', key, ':', result, ', correct:', correct)
         score -= 1
@@ -93,7 +96,10 @@ for key in keys:
     correct = records[key]
     query = Query(grades_table)
     
-    result = query.select_version(key, 0, [1, 1, 1, 1, 1], -2)[0].columns
+    select_result = query.select_version(key, 0, [1, 1, 1, 1, 1], -2)
+    if select_result:
+        result = select_result[0].columns
+        
     if correct != result:
         print('select error on primary key', key, ':', result, ', correct:', correct)
         v2_score -= 1

@@ -71,7 +71,7 @@ class Index:
         if value not in tree:
             return None
 
-        return tree[value]  # For now this returns a set of RIDs
+        return tree[value].copy()  # For now this returns a set of RIDs
 
     """
     # Returns the RIDs of all records with values in column "column" between "begin" and "end"
