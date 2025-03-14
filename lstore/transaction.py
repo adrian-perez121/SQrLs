@@ -1,5 +1,6 @@
 
-from lstore.LockManager import RWLock
+from typing import List
+from lstore.Strict2PL import LockState, RWLock
 from lstore.query import Query
 
 
@@ -46,7 +47,8 @@ class Transaction:
 
             # Execute queries after acquiring locks
             for query, args in self.queries:
-                result = query(*args)
+                query_locks: List[tuple[bool, LockState]] = [None]
+                result = query(*args, transaction_locks=[])
                 if not result:
                     return self.abort()
 

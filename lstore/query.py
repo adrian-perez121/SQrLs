@@ -1,6 +1,8 @@
 import time
 from binascii import b2a_hex
+from typing import List, Optional
 
+from lstore.Strict2PL import LockState
 from lstore.bufferpool import BufferPool, Frame
 from lstore.page_range import PageRange
 from lstore.table import Table
@@ -46,7 +48,7 @@ class Query:
     # Returns True upon succesful deletion
     # Return False if record doesn't exist or is locked due to 2PL
     """
-    def delete(self, primary_key):
+    def delete(self, primary_key, transaction_locks: Optional[List[tuple[bool, LockState]]] = None):
         # After your all done, remove the primary key from the primary key index
         rids = self.table.index.locate(self.table.key, primary_key).copy()
 
@@ -240,9 +242,6 @@ class Query:
                 base_record.columns[i] = tail_record[config.NUM_META_COLUMNS + i]
 
           version_records.append(base_record)
-
-
-
 
       return version_records
 

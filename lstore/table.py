@@ -3,7 +3,7 @@ from lstore.index import Index
 from lstore.page_range import PageRange
 from time import time
 import threading
-from lstore.LockManager import RWLock
+from lstore.Strict2PL import RWLock
 from collections import defaultdict
 import json
 from lstore.page_range import PageRange
