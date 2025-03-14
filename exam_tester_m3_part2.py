@@ -26,6 +26,8 @@ keys = []
 records = {}
 seed(3562901)
 
+scores = []
+
 # re-generate records for testing
 for i in range(0, number_of_records):
     key = 92106429 + i
@@ -90,6 +92,7 @@ for key in keys:
         print('select error on primary key', key, ':', result, ', correct:', correct)
         score -= 1
 print('Version -1 Score:', score, '/', len(keys))
+scores.append(score)
 
 v2_score = len(keys)
 for key in keys:
@@ -99,11 +102,12 @@ for key in keys:
     select_result = query.select_version(key, 0, [1, 1, 1, 1, 1], -2)
     if select_result:
         result = select_result[0].columns
-        
+
     if correct != result:
         print('select error on primary key', key, ':', result, ', correct:', correct)
         v2_score -= 1
 print('Version -2 Score:', v2_score, '/', len(keys))
+scores.append(v2_score)
 if score != v2_score:
     print('Failure: Version -1 and Version -2 scores must be same')
 
@@ -112,11 +116,15 @@ for key in keys:
     correct = updated_records[key]
     query = Query(grades_table)
     
-    result = query.select_version(key, 0, [1, 1, 1, 1, 1], 0)[0].columns
+    select_result = query.select_version(key, 0, [1, 1, 1, 1, 1], 0)
+    if select_result:
+        result = select_result[0].columns
+
     if correct != result:
         print('select error on primary key', key, ':', result, ', correct:', correct)
         score -= 1
 print('Version 0 Score:', score, '/', len(keys))
+scores.append(score)
 
 number_of_aggregates = 100
 valid_sums = 0
@@ -147,5 +155,7 @@ for i in range(0, number_of_aggregates):
     if column_sum == result:
         valid_sums += 1
 print("Aggregate version 0 finished. Valid Aggregations: ", valid_sums, '/', number_of_aggregates)
+
+print(f"v1 score: {scores[0]}\nv2 score: {scores[1]}\nv0 score: {scores[2]}")
 
 db.close()
