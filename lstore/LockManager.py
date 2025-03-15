@@ -12,35 +12,30 @@ class Read_Write_Lock:
 
 	def acquire_read(self):
 		self.lock.acquire()
+		ret = None
+		with self.lock:
+			if self.writer:
+				ret = False
+			else:
+				self.reader += 1
+				ret = True
 
-		if self.writer:
-			self.lock.release()
-			return False
-		else:
-			self.reader += 1
-			self.lock.release()
-			return True
-
+		return ret
 	def release_read(self):
-		self.lock.acquire()
-		self.reader -= 1
-		self.lock.release()
+		with self.lock:
+			self.reader -= 1
 
 	def acquire_write(self):
-		self.lock.acquire()
+		ret = None
+		with self.lock:
+			if self.reader or self.writer:
+				ret = False
+			else:
+				self.writer = True
+				ret = True
 
-		if self.reader != 0:  # if something is reader, can't write
-			self.lock.release()
-			return False
-		elif self.writer:  # if something else is writer, can't write
-			self.lock.release()
-			return False
-		else:
-			self.writer = True
-			self.lock.release()
-			return True
+		return ret
 
 	def release_write(self):
-		self.lock.acquire()
-		self.writer = False
-		self.lock.release()
+		with self.lock:
+			self.writer = False
