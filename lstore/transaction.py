@@ -32,7 +32,7 @@ class Transaction:
         try:
             # Acquire necessary locks for queries
             for query, args in self.queries:
-                key = args[0]
+                key = args[self.table.key]
 
                 if key not in self.table.lock_manager:
                     self.insert_locks.add(key)
@@ -67,6 +67,7 @@ class Transaction:
         for key in self.insert_locks:
             del self.table.lock_manager[key]  # Cleanup inserted records
         # print("aborting")
+        # The abort helper methods have to go in here
         return False
 
     """
